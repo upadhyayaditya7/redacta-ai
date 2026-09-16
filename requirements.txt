@@ -1,1 +1,13 @@
-# Redacta AI dependencies will be added here.
+# Redacta AI — core (stdlib only; these are for docs/PDF/UI/tests)
+pypdf>=5.0
+reportlab>=4.2
+streamlit>=1.40
+pillow>=11.0
+pytest>=8.3
+
+# --- Optional AI layer (graceful fallback to regex-only without these) ---
+# gliner>=0.2.16        # GLiNER PII NER (torch) — install when Python/torch wheels allow
+# pytesseract>=0.3.13   # image OCR (needs the Tesseract binary on PATH)
+
+# --- Qualcomm AI Hub export (milestone M2) ---
+# qai-hub>=0.30         # compile + profile GLiNER for Hexagon NPU

@@ -1,9 +1,23 @@
+# Python
 __pycache__/
 *.pyc
 .venv/
 venv/
+
+# Secrets / env
 .env
 .vscode/
+
+# Model weights (never commit)
 models/*.onnx
 models/*.bin
 models/*.safetensors
+
+# Generated demo data & redacted outputs
+data/
+*.redacted.txt
+*.redacted.pdf
+*.redacted.png
+
+# Tooling metadata
+.freebuff/

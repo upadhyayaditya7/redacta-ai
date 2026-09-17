@@ -1,0 +1,11 @@
+# Redacta AI — Streamlit theme & runtime config
+
+[theme]
+base = "dark"
+primaryColor = "#8b5cf6"
+backgroundColor = "#0b0f1a"
+secondaryBackgroundColor = "#131a2b"
+textColor = "#e8ebf5"
+
+[browser]
+gatherUsageStats = false

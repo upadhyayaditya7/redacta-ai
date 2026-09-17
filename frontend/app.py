@@ -88,6 +88,68 @@ border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:14px 18px;heig
 .stat .lbl{font-size:.74rem;color:#8b94ab;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
 .stat.v .num{color:#c4b5fd}.stat.c .num{color:#67e8f9}.stat.g .num{color:#6ee7b7}
 
+/* finding cards */
+.scroll{max-height:520px;overflow-y:auto;padding-right:6px}
+.scroll::-webkit-scrollbar{width:8px}
+.scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.10);border-radius:8px}
+.finding{display:flex;gap:13px;align-items:flex-start;
+background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.015));
+border:1px solid rgba(255,255,255,.08);border-left:3px solid var(--bar,#8b5cf6);
+border-radius:14px;padding:12px 15px;margin:0 0 10px;animation:rise .3s ease both}
+.finding .ico{width:36px;height:36px;flex:none;border-radius:10px;
+background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);
+display:flex;align-items:center;justify-content:center;font-size:1.05rem}
+.finding .head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.finding .name{font-weight:700;color:#eef1f8;font-size:.95rem}
+.finding .val{font-family:Consolas,monospace;font-size:.84rem;color:#a5f3fc;
+background:rgba(34,211,238,.06);border:1px solid rgba(34,211,238,.2);
+padding:2px 8px;border-radius:8px;word-break:break-all}
+.finding .why{color:#8b94ab;font-size:.83rem;margin-top:4px}
+.finding .why b{color:#b7c0d8;font-weight:600}
+.scorebar{position:relative;height:5px;border-radius:999px;background:rgba(255,255,255,.07);
+margin-top:8px;overflow:hidden;max-width:200px}
+.scorebar>i{position:absolute;top:0;bottom:0;left:0;border-radius:999px;
+background:linear-gradient(90deg,var(--bar,#8b5cf6),#22d3ee)}
+
+/* hero */
+.hero{animation:rise .45s ease both;margin:0 0 14px}
+.badge{display:inline-flex;align-items:center;gap:8px;padding:5px 13px;border-radius:999px;
+background:rgba(139,92,246,.12);border:1px solid rgba(139,92,246,.35);color:#c4b5fd;
+font-size:.76rem;font-weight:700;letter-spacing:.09em;margin-bottom:12px}
+.badge .dot{width:7px;height:7px;border-radius:50%;background:var(--good);
+box-shadow:0 0 8px var(--good);display:inline-block;animation:pulse 2.2s ease infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+.title{font-size:clamp(1.9rem,3.4vw,2.7rem);line-height:1.12;font-weight:800;
+color:#f4f6fb;margin:0 0 8px;letter-spacing:-.02em}
+.title .grad{background:linear-gradient(90deg,#a78bfa,#22d3ee);
+-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{color:#8b94ab;font-size:1rem;margin:0 0 14px;max-width:620px}
+.sub strong{color:#e8ebf5}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:999px;
+font-weight:700;font-size:.8rem;margin-right:8px}
+.pill.ok{background:rgba(52,211,153,.10);color:#6ee7b7;border:1px solid rgba(52,211,153,.35)}
+.pill.warn{background:rgba(251,191,36,.08);color:#fcd34d;border:1px solid rgba(251,191,36,.3)}
+.pill.violet{background:rgba(139,92,246,.10);color:#c4b5fd;border:1px solid rgba(139,92,246,.35)}
+.pill.cyan{background:rgba(34,211,238,.08);color:#67e8f9;border:1px solid rgba(34,211,238,.3)}
+
+/* token rows */
+.token-row{display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.03);
+border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:8px 13px;margin:0 0 8px;
+font-family:Consolas,monospace;font-size:.86rem}
+.token-row .tok{color:#fcd34d;font-weight:700;white-space:nowrap}
+.token-row .arr{color:#4b5568}
+.token-row .hint{color:#8b94ab}
+
+/* brand + side cards */
+.brand{font-size:1.45rem;font-weight:800;color:#f4f6fb;margin:0}
+.brand .grad{background:linear-gradient(90deg,#a78bfa,#22d3ee);
+-webkit-background-clip:text;background-clip:text;color:transparent}
+.brand-sub{color:#8b94ab;font-size:.85rem;margin:2px 0 14px}
+.side-card{background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.08);
+border-radius:14px;padding:12px 14px;margin:10px 0 14px;font-size:.86rem;color:#8b94ab}
+.side-label{font-size:.72rem;font-weight:700;letter-spacing:.11em;text-transform:uppercase;
+color:#79829a;margin:0 0 8px}
+
 /* misc */
 .glass{background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.015));
 border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:16px 18px}
@@ -118,7 +180,22 @@ def _types_from_selection(selected: list[str]) -> list[EntityType] | None:
     return [EntityType(t) for t in selected]
 
 
-# [hero lands here]
+# ------------------------------------------------------------- hero ----
+ner_pill = (
+    '<span class="pill ok">✦ AI NER tier armed</span>'
+    if st.session_state.ner_ready
+    else '<span class="pill warn">⚠ AI tier standby — checksum engine active</span>'
+)
+st.markdown(
+    f"""<div class="hero">
+<div class="badge"><span class="dot"></span>100% ON-DEVICE · ZERO CLOUD · ZERO TELEMETRY</div>
+<div class="title">Your data, <span class="grad">redacted</span>.<br>Nothing leaves this machine.</div>
+<p class="sub">Paste any document — Redacta finds Aadhaar, PAN, cards and secrets with
+<strong>checksum-proof evidence</strong>, then redacts them <strong>reversibly</strong> with a key only you hold.</p>
+<div>{ner_pill}<span class="pill violet">🛡 Encrypted local vault</span><span class="pill cyan">⚡ millisecond scans</span></div>
+</div>""",
+    unsafe_allow_html=True,
+)
 
 # ----------------------------------------------------------- sidebar ---
 with st.sidebar:

@@ -280,22 +280,41 @@ if run_scan or run_redact:
     with st.spinner("Analysing on-device…"):
         report = pipeline.analyze(input_text, types)
 
+    sev_bar = {"critical": "#f472b6", "normal": "#8b5cf6", "low": "#38bdf8"}
+    find_html: list[str] = []
+    for s in report.spans:
+        sp = ENTITY_SPECS[s.entity_type]
+        bar = "#34d399" if s.score >= 0.99 else ("#fbbf24" if s.score >= 0.9 else sev_bar.get(sp.severity, "#8b5cf6"))
+        pill = "ok" if s.score >= 0.99 else "violet"
+        find_html.append(
+            f'<div class="finding" style="--bar:{bar}">'
+            f'<div class="ico">{sp.icon}</div><div style="flex:1;min-width:0">'
+            f'<div class="head"><span class="name">{sp.label}</span>'
+            f'<span class="val">{s.text}</span></div>'
+            f'<div class="why"><b>{s.detector}</b> · {s.reason}</div>'
+            f'<div class="scorebar"><i style="width:{min(s.score, 1) * 100:.0f}%"></i></div>'
+            f'</div><span class="pill {pill}">{s.score:.2f}</span></div>'
+        )
+    findings_body = "".join(find_html) or (
+        '<div style="color:#8b94ab;font-size:.9rem">No PII detected in this text.</div>'
+    )
+
     tab1, tab2, tab3 = st.tabs(
         [f"📊 Findings · {len(report.spans)}", "🧹 Redacted output", "⚙ Engine"]
     )
 
     with tab1:
-        st.success(f"**{len(report.spans)} entities** found in {report.total_ms:.1f} ms "
-                   f"(regex {report.regex_ms:.1f} ms · NER {report.ner_ms:.1f} ms)")
-        for s in report.spans:
-            sp = ENTITY_SPECS[s.entity_type]
-            st.markdown(
-                f"{sp.icon} **{sp.label}** — `{s.text}`  \n"
-                f"<span style='color:gray'>score {s.score:.2f} · {s.detector} · {s.reason}</span>",
-                unsafe_allow_html=True,
-            )
-        if not report.spans:
-            st.info("No PII detected.")
+        m1, m2, m3, m4 = st.columns(4)
+        m1.markdown(f'<div class="stat v"><div class="num">{len(report.spans)}</div>'
+                    f'<div class="lbl">Entities found</div></div>', unsafe_allow_html=True)
+        m2.markdown(f'<div class="stat g"><div class="num">{sum(1 for s in report.spans if s.score >= 0.99)}</div>'
+                    f'<div class="lbl">Checksum-verified</div></div>', unsafe_allow_html=True)
+        m3.markdown(f'<div class="stat c"><div class="num">{report.total_ms:.1f} ms</div>'
+                    f'<div class="lbl">Scan time</div></div>', unsafe_allow_html=True)
+        m4.markdown(f'<div class="stat"><div class="num">{report.text_length:,}</div>'
+                    f'<div class="lbl">Characters</div></div>', unsafe_allow_html=True)
+        st.write("")
+        st.markdown('<div class="scroll">' + findings_body + "</div>", unsafe_allow_html=True)
         if not report.ner_available:
             st.caption("ℹ️ AI NER tier not installed here — checksum-validated regex ran solo. Still 100% local.")
 
@@ -305,14 +324,29 @@ if run_scan or run_redact:
             st.session_state["last_result"] = result
         if "last_result" in st.session_state:
             result = st.session_state["last_result"]
+            r1, r2, r3 = st.columns(3)
+            r1.markdown(f'<div class="stat"><div class="num">{result.redacted_count}</div>'
+                        f'<div class="lbl">Redacted</div></div>', unsafe_allow_html=True)
+            r2.markdown(f'<div class="stat v"><div class="num">{result.vaulted_count}</div>'
+                        f'<div class="lbl">Vaulted · reversible</div></div>', unsafe_allow_html=True)
+            r3.markdown(f'<div class="stat c"><div class="num">{len(result.redacted_text):,}</div>'
+                        f'<div class="lbl">Output chars</div></div>', unsafe_allow_html=True)
+            st.write("")
+            st.markdown('<div class="sec-title">Sanitised document</div>', unsafe_allow_html=True)
             st.code(result.redacted_text or "—", language="text")
-            c1, c2 = st.columns(2)
-            c1.metric("Redacted", result.redacted_count)
-            c2.metric("Vaulted (reversible)", result.vaulted_count)
             if result.token_map and vault_pass:
-                st.caption("Reveal any token with its passphrase — original never left this machine.")
-                for token in list(result.token_map)[:12]:
-                    st.markdown(f"`{token}` → {vault_obj.entry_hint(token)}")
+                rows = "".join(
+                    f'<div class="token-row"><span class="tok">{token}</span>'
+                    f'<span class="arr">→</span><span class="hint">{vault_obj.entry_hint(token)}</span></div>'
+                    for token in list(result.token_map)[:12]
+                )
+                st.markdown(
+                    '<div class="glass"><div class="sec-title">Vault tokens — originals encrypted on this disk</div>'
+                    + rows
+                    + '<div style="color:#8b94ab;font-size:.84rem;margin-top:6px">Reveal from the CLI: '
+                      '<code>python app.py reveal «RDCT-…» --vault-pass …</code></div></div>',
+                    unsafe_allow_html=True,
+                )
             elif result.token_map:
                 st.info("Vault locked — redactions were irreversible. Enter a passphrase in the sidebar "
                         "and redact again for reversible tokens.")

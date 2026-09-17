@@ -31,7 +31,74 @@ st.set_page_config(
     initial_sidebar_state="auto",
 )
 
-# [theme lands here]
+# ------------------------------------------------------------ theme ----
+# One CSS block for the whole page.  System fonts only (no Google Fonts):
+# the app must make ZERO network requests — that's the product's promise.
+
+CSS = """<style>
+:root{--accent:#8b5cf6;--accent2:#22d3ee;--good:#34d399;--warn:#fbbf24;
+--text:#e8ebf5;--muted:#8b94ab;--line:rgba(255,255,255,.08)}
+html,body,.stApp,[class*=css],.stMarkdown,p,h1,h2,h3{
+font-family:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif}
+.stApp{background:
+radial-gradient(1000px 480px at 10% -8%,rgba(139,92,246,.13),transparent 60%),
+radial-gradient(760px 380px at 104% 0%,rgba(34,211,238,.09),transparent 55%),
+#0a0e17;color:var(--text)}
+#MainMenu,footer,.stDeployButton,header[data-testid=stHeader]{visibility:hidden}
+.block-container{padding-top:2.4rem;max-width:1140px}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* editor + buttons */
+.stTextArea textarea{background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.02))!important;
+border:1px solid rgba(255,255,255,.10)!important;border-radius:14px!important;
+color:var(--text)!important;font-size:.95rem!important;line-height:1.6!important;padding:16px!important}
+.stTextArea textarea:focus{border-color:rgba(139,92,246,.6)!important;
+box-shadow:0 0 0 3px rgba(139,92,246,.16)!important}
+.stTextArea textarea::placeholder{color:#5d6680!important}
+.stButton>button{border-radius:12px!important;font-weight:700!important;
+border:1px solid rgba(255,255,255,.12)!important;color:var(--text)!important;
+background:rgba(255,255,255,.04)!important;
+transition:transform .12s ease,box-shadow .12s ease,border-color .12s ease}
+.stButton>button:hover{transform:translateY(-1px);border-color:rgba(255,255,255,.24)!important}
+.stButton>button[kind=primary]{background:linear-gradient(135deg,#8b5cf6,#6d28d9)!important;
+border:none!important;color:#fff!important;box-shadow:0 8px 22px rgba(139,92,246,.32)!important}
+
+/* sidebar */
+[data-testid=stSidebar]{background:
+radial-gradient(420px 240px at 0% 0%,rgba(139,92,246,.12),transparent 60%),
+#0d1220;border-right:1px solid rgba(255,255,255,.06)}
+[data-testid=stSidebar] .block-container{padding-top:1.6rem}
+.stTextInput input{background:rgba(255,255,255,.05)!important;
+border:1px solid rgba(255,255,255,.12)!important;border-radius:12px!important;color:var(--text)!important}
+.stTextInput input:focus{border-color:rgba(139,92,246,.6)!important}
+[data-baseweb=tag]{background:rgba(139,92,246,.16)!important;border:1px solid rgba(139,92,246,.4)!important;
+color:#ddd6fe!important;border-radius:8px!important}
+
+/* tabs */
+.stTabs [data-baseweb=tab-list]{gap:4px;border-bottom:1px solid rgba(255,255,255,.08)}
+.stTabs [data-baseweb=tab]{background:transparent;border:none;border-radius:10px;padding:9px 16px}
+.stTabs [data-baseweb=tab] p{font-weight:700;font-size:.9rem;color:#8b94ab}
+.stTabs [aria-selected=true]{background:rgba(139,92,246,.13)!important;border-radius:10px!important}
+.stTabs [aria-selected=true] p{color:#ddd6fe!important}
+
+/* stat cards */
+.stat{background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.02));
+border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:14px 18px;height:100%}
+.stat .num{font-size:1.9rem;font-weight:800;color:#f4f6fb;line-height:1.15}
+.stat .lbl{font-size:.74rem;color:#8b94ab;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.stat.v .num{color:#c4b5fd}.stat.c .num{color:#67e8f9}.stat.g .num{color:#6ee7b7}
+
+/* misc */
+.glass{background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.015));
+border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:16px 18px}
+.sec-title{font-size:.92rem;font-weight:700;color:#e8ebf5;margin:0 0 10px}
+.stJson{background:rgba(255,255,255,.03)!important;border:1px solid rgba(255,255,255,.08)!important;border-radius:12px!important}
+hr{border-color:rgba(255,255,255,.08)}
+.foot{color:#6b7490;font-size:.84rem;text-align:center;padding:16px 0 2px}
+.foot b{color:#9aa3b8}
+</style>"""
+
+st.markdown(CSS, unsafe_allow_html=True)
 
 # --------------------------------------------------------- session -----
 if "pipeline" not in st.session_state:

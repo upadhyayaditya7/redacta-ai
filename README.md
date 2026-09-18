@@ -33,7 +33,14 @@ watch zero bytes leave the machine.
   locations and organisations. Degrades gracefully: no torch? Regex still runs.
 - **Text, PDF and screenshot redaction** (PDF via pypdf; images via OCR +
   painted redaction boxes).
-- **CLI + Streamlit UI** — script it or click it.
+- **Batch mode** — `python app.py batch inbox/ [--watch]` redacts every
+  document in a folder (text/PDF/image); `--watch` keeps polling for new
+  arrivals, drop-folder style.
+- **Audit trail** — every run emits a JSON report of *what* was detected and
+  *what action* was taken (vaulted vs irreversible), with hints only — no raw
+  values — so the report is safe to archive for compliance.
+- **CLI + Streamlit UI** — script it or click it; the UI also takes file
+  uploads (PDF/PNG/JPG/txt) with download buttons for redacted outputs.
 
 ## Quickstart
 
@@ -43,6 +50,7 @@ pip install -r requirements.txt
 python app.py keygen                          # fake-but-checksum-valid sample doc
 python app.py scan data/samples/demo.txt      # detect + explain
 python app.py redact data/samples/demo.txt --vault-pass demo1234 --show-tokens
+python app.py batch data/inbox --vault-pass demo1234 [--watch]  # folder mode
 python -c "from core.vault import Vault; print(Vault().reveal('«RDCT-…»'))"  # with --vault-pass
 python app.py bench                           # latency → benchmarks/baseline.md
 python app.py models                          # model stack + AI Hub targets
@@ -50,7 +58,7 @@ python app.py models                          # model stack + AI Hub targets
 streamlit run frontend/app.py                 # the UI
 ```
 
-Tests: `python -m pytest tests -q` (21 passing).
+Tests: `python -m pytest tests -q` (24 passing).
 
 ## Architecture
 
@@ -63,6 +71,8 @@ core/
   pipeline.py     regex + NER merge with per-stage timings
   redact.py       text / PDF / image redaction
   vault.py        stdlib-crypto reversible vault
+  audit.py        JSON audit trail (hints only, no raw values)
+  batch.py        folder batch + watch mode
 models/
   registry.py     model stack + AI Hub export targets
   export_ai_hub.py  GLiNER → ONNX → QNN (Hexagon NPU) export scaffold
@@ -81,9 +91,9 @@ required to generate the report.
 
 ## Status
 
-Working pipeline (detect → explain → redact → vault → reveal → bench), 21
-tests passing. Roadmap: AI Hub NPU profiling (M2), OCR screenshot mode polish,
-watch-folder batch mode.
+Working pipeline (detect → explain → redact → vault → reveal → batch →
+audit), 24 tests passing. Roadmap: AI Hub NPU profiling (M2), OCR screenshot
+mode polish.
 
 ## License / ownership
 

@@ -8,6 +8,7 @@ irreversible types are masked permanently.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from .entities import Action, EntityType, spec
 from .pipeline import PipelineReport
@@ -65,14 +66,17 @@ def redact_pdf(
     pipeline,
     vault: Vault | None = None,
     types: list[EntityType] | None = None,
+    out_dir=None,
 ) -> tuple[RedactionResult, str]:
     """Extract text from a PDF, redact it, and render a clean PDF.
 
     Returns (result, output_path).  The output keeps the document text
     (redacted) and notes which engine ran; scans fall back to OCR when
-    tesseract is installed.
+    tesseract is installed.  ``out_dir`` relocates the output (batch mode).
     """
     from pypdf import PdfReader
+
+    stem = Path(str(pdf_path)).stem
 
     reader = PdfReader(str(pdf_path))
     pages = [(page.extract_text() or "") for page in reader.pages]
@@ -81,7 +85,9 @@ def redact_pdf(
     report = pipeline.analyze(full_text, types)
     result = redact_text(full_text, report, vault, types)
 
-    out_path = str(pdf_path)[:-4] + "_redacted.pdf"
+    base = Path(out_dir) if out_dir else Path(str(pdf_path)).parent
+    base.mkdir(parents=True, exist_ok=True)
+    out_path = str(base / (stem + "_redacted.pdf"))
     try:
         from reportlab.lib.pagesizes import A4
         from reportlab.pdfgen import canvas as pdfcanvas
@@ -98,7 +104,7 @@ def redact_pdf(
             y -= 11
         c.save()
     except ImportError:
-        txt_path = str(pdf_path)[:-4] + "_redacted.txt"
+        txt_path = str(base / (stem + "_redacted.txt"))
         with open(txt_path, "w", encoding="utf-8") as fh:
             fh.write(result.redacted_text)
         out_path = txt_path
@@ -110,6 +116,7 @@ def redact_image(
     pipeline,
     vault: Vault | None = None,
     types: list[EntityType] | None = None,
+    out_dir=None,
 ) -> tuple[RedactionResult, str]:
     """OCR an image, detect PII, and paint black boxes over it."""
     try:
@@ -151,6 +158,8 @@ def redact_image(
             if start < span.end and span.start < end:  # overlap
                 draw.rectangle([x - 2, y - 2, x + w + 2, y + h + 2], fill="black")
 
-    out_path = str(image_path).rsplit(".", 1)[0] + "_redacted.png"
+    base = Path(out_dir) if out_dir else Path(str(image_path)).parent
+    base.mkdir(parents=True, exist_ok=True)
+    out_path = str(base / (Path(str(image_path)).stem + "_redacted.png"))
     image.save(out_path)
     return result, out_path

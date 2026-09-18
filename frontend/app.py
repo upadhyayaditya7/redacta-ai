@@ -18,9 +18,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import streamlit as st
 
+from core import __version__
+from core.audit import build_record
 from core.entities import ENTITY_SPECS, EntityType
 from core.pipeline import RedactionPipeline
-from core.redact import redact_text
+from core.redact import redact_image, redact_pdf, redact_text
 from core.vault import Vault
 from utils.samples import document
 
@@ -274,6 +276,64 @@ input_text = st.text_area(
 b1, b2, b3 = st.columns([1, 1, 3])
 run_scan = b1.button("🔍  Scan", type="primary", use_container_width=True)
 run_redact = b2.button("🧹  Redact", use_container_width=True)
+
+# ------------------------------------------------------ file upload ----
+st.markdown('<div class="sec-title" style="margin-top:18px">…or drop a file — PDF, screenshot or text (stays on this device)</div>',
+            unsafe_allow_html=True)
+upload = st.file_uploader(
+    "Upload", type=["pdf", "png", "jpg", "jpeg", "bmp", "webp", "txt", "md", "csv", "json"],
+    label_visibility="collapsed",
+    help="Processed locally — the file never leaves this machine.",
+)
+
+if upload is not None:
+    suffix = Path(upload.name).suffix.lower()
+    tmp = Path("data") / "uploads"
+    tmp.mkdir(parents=True, exist_ok=True)
+    local_path = tmp / upload.name
+    local_path.write_bytes(upload.getvalue())
+
+    up_col1, up_col2 = st.columns([1, 3])
+    if up_col1.button("🧹  Redact file", type="primary", use_container_width=True):
+        with st.spinner("Redacting on-device…"):
+            try:
+                if suffix == ".pdf":
+                    result, out_path = redact_pdf(local_path, pipeline, vault_obj if vault_pass else None,
+                                                  _types_from_selection(selected))
+                elif suffix in {".png", ".jpg", ".jpeg", ".bmp", ".webp"}:
+                    result, out_path = redact_image(local_path, pipeline, vault_obj if vault_pass else None,
+                                                    _types_from_selection(selected))
+                else:
+                    text = local_path.read_text(encoding="utf-8", errors="replace")
+                    report = pipeline.analyze(text, _types_from_selection(selected))
+                    result = redact_text(text, report, vault_obj if vault_pass else None,
+                                         _types_from_selection(selected))
+                    out_path = tmp / (local_path.stem + ".redacted.txt")
+                    out_path.write_text(result.redacted_text, encoding="utf-8")
+                st.session_state["file_result"] = (upload.name, out_path, result)
+                # Audit record for the file run.
+                rec = build_record(
+                    source=upload.name,
+                    report=result.report,
+                    result=result,
+                    vault_hints={t: vault_obj.entry_hint(t) for t in result.token_map} if vault_pass else None,
+                )
+                st.session_state["file_audit"] = rec.to_json()
+            except Exception as exc:  # noqa: BLE001 — surface OCR/parse errors in the UI
+                st.error(f"Could not process this file: {exc}")
+
+    if "file_result" in st.session_state and st.session_state["file_result"][0] == upload.name:
+        name, out_path, fresult = st.session_state["file_result"]
+        out_name = Path(out_path).name
+        data = Path(out_path).read_bytes()
+        st.success(f"Redacted {fresult.redacted_count} entities ({fresult.vaulted_count} vaulted) → {out_name}")
+        dl1, dl2 = st.columns(2)
+        dl1.download_button("⬇️  Download redacted file", data, file_name=out_name,
+                            use_container_width=True)
+        if "file_audit" in st.session_state:
+            dl2.download_button("🧾  Download audit report (JSON)", st.session_state["file_audit"],
+                                file_name=out_name + ".audit.json", mime="application/json",
+                                use_container_width=True)
 
 if run_scan or run_redact:
     if not input_text.strip():

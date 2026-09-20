@@ -21,6 +21,7 @@ import streamlit as st
 from core import __version__
 from core.audit import build_record
 from core.entities import ENTITY_SPECS, EntityType
+from core.ner_detector import ONNX_DIR as NER_ONNX_DIR
 from core.pipeline import RedactionPipeline
 from core.redact import redact_image, redact_pdf, redact_text
 from core.vault import Vault
@@ -216,9 +217,10 @@ with st.sidebar:
         help="Adds names/locations/orgs. Falls back to regex-only when unavailable.",
     )
     if st.session_state.ner_ready:
+        backend = "ONNX" if (NER_ONNX_DIR / "model.onnx").exists() else "PyTorch"
         st.markdown(
-            '<div class="side-card">✅ <b style="color:#6ee7b7">GLiNER available</b> — '
-            "NER tier active on top of the regex engine.</div>",
+            f'<div class="side-card">✅ <b style="color:#6ee7b7">GLiNER available</b> '
+            f"({backend}) — NER tier active on top of the regex engine.</div>",
             unsafe_allow_html=True,
         )
     else:
@@ -421,6 +423,7 @@ if run_scan or run_redact:
             "regex_ms": round(report.regex_ms, 2),
             "ner_ms": round(report.ner_ms, 2),
             "ner_available": report.ner_available,
+            "ner_backend": report.ner_backend,
             "ner_error": report.ner_error,
             "chars": report.text_length,
             "vault_path": str(vault_obj.path),

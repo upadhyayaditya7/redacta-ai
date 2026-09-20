@@ -23,6 +23,7 @@ class PipelineReport:
     regex_ms: float = 0.0
     ner_ms: float = 0.0
     ner_available: bool = False
+    ner_backend: str | None = None  # "onnx" (on-device export) | "torch"
     ner_error: str | None = None
     text_length: int = 0
 
@@ -59,6 +60,7 @@ class RedactionPipeline:
             # "available" now means the model actually loaded and ran —
             # not merely that no error has been recorded yet.
             report.ner_available = self.ner.loaded
+            report.ner_backend = self.ner.backend
             report.ner_error = self.ner.error
             spans.extend(ner_result.spans)
 

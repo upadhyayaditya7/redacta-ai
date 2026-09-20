@@ -59,9 +59,12 @@ def cmd_scan(args) -> int:
     text = Path(args.file).read_text(encoding="utf-8")
     pipeline = _build_pipeline(args)
     report = pipeline.analyze(text, _parse_types(args.types))
+    if report.ner_available:
+        ner_status = f"available, {report.ner_backend or 'unknown'} backend"
+    else:
+        ner_status = "not installed — regex-only mode"
     print(f"Scanned {len(text):,} chars in {report.total_ms:.1f} ms")
-    print(f"regex: {report.regex_ms:.1f} ms | ner: {report.ner_ms:.1f} ms "
-          f"({'available' if report.ner_available else 'not installed — regex-only mode'})")
+    print(f"regex: {report.regex_ms:.1f} ms | ner: {report.ner_ms:.1f} ms ({ner_status})")
     if report.ner_error:
         print(f"ner note: {report.ner_error}")
     print(f"\nDetected {len(report.spans)} entities:\n")

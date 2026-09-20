@@ -5,9 +5,14 @@ streamlit>=1.40
 pillow>=11.0
 pytest>=8.3
 
-# --- Optional AI layer (graceful fallback to regex-only without these) ---
-# gliner>=0.2.16        # GLiNER PII NER (torch) — install when Python/torch wheels allow
-# pytesseract>=0.3.13   # image OCR (needs the Tesseract binary on PATH)
-
-# --- Qualcomm AI Hub export (milestone M2) ---
-# qai-hub>=0.30         # compile + profile GLiNER for Hexagon NPU
+# --- Optional AI layer -------------------------------------------------------
+# Not required: without these, Redacta runs in regex-only mode and says so.
+# Verified working on Python 3.14 / torch 2.13 / gliner 0.2.29.
+#   pip install -r requirements-ai.txt
+#
+#   gliner>=0.2.29        # GLiNER PII NER (pulls torch) — names, orgs, locations
+#   onnxruntime>=1.20     # runs the exported ONNX graph (no torch at runtime)
+#   onnx>=1.17            # only needed to re-export
+#   qai-hub>=0.55         # Qualcomm AI Hub: compile + profile to Hexagon NPU
+#
+# pytesseract>=0.3.13     # image OCR (also needs the Tesseract binary on PATH)

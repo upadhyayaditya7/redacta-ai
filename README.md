@@ -58,7 +58,7 @@ python app.py models                          # model stack + AI Hub targets
 streamlit run frontend/app.py                 # the UI
 ```
 
-Tests: `python -m pytest tests -q` (24 passing).
+Tests: `python -m pytest tests -q` (31 passing).
 
 ## Architecture
 
@@ -67,33 +67,47 @@ core/
   entities.py     entity registry + redaction policy (vault vs irreversible)
   validators.py   Verhoeff / PAN / IFSC / Luhn / date checks
   regex_rules.py  deterministic detector: 12 rules, overlap resolution, reasons
-  ner_detector.py optional GLiNER wrapper (graceful fallback)
+  ner_detector.py optional GLiNER wrapper — ONNX first, then PyTorch, then
+                  regex-only (always reports which backend ran)
   pipeline.py     regex + NER merge with per-stage timings
   redact.py       text / PDF / image redaction
   vault.py        stdlib-crypto reversible vault
   audit.py        JSON audit trail (hints only, no raw values)
   batch.py        folder batch + watch mode
 models/
-  registry.py     model stack + AI Hub export targets
-  export_ai_hub.py  GLiNER → ONNX → QNN (Hexagon NPU) export scaffold
+  registry.py       model stack + AI Hub export targets
+  export_ai_hub.py  real ONNX export + AI Hub compile/profile for Hexagon NPU
 frontend/app.py   Streamlit studio
 utils/            synthetic data generator (checksum-valid fakes), benchmark harness
 ```
 
 ## Snapdragon NPU path
 
-Dev machines run the regex tier on CPU and GLiNER via PyTorch/ONNX Runtime.
-The NPU leg (`models/export_ai_hub.py`) compiles GLiNER via Qualcomm AI Hub
-into a QNN context binary for Hexagon (Snapdragon X / X2 Plus), and the
-benchmark harness (`utils/benchmark.py`) is built to produce the CPU-vs-NPU
-comparison table. AI Hub profiling works cloud-side — no Snapdragon device
-required to generate the report.
+The AI tier is exported to ONNX with a pinned PII label prompt and served by
+ONNX Runtime on-device — no torch needed at inference. `models/export_ai_hub.py`
+then submits that same graph to Qualcomm AI Hub for a QNN compile + profile job
+targeting the Hexagon NPU (Snapdragon X / X2 Plus). AI Hub compiles cloud-side,
+so real NPU numbers need no Snapdragon device.
+
+```bash
+pip install -r requirements-ai.txt
+python -m models.export_ai_hub --dry-run    # plan only, no dependencies
+python -m models.export_ai_hub --all        # export + verify + benchmark + report
+python -m models.export_ai_hub --submit     # needs a free AI Hub token
+```
+
+Measured on CPU (see [`benchmarks/npu.md`](benchmarks/npu.md)): regex tier
+**0.27 ms/doc**, AI tier **~285 ms/doc** warm — which is exactly the case for
+moving the graph onto the HTP. Two findings are recorded there rather than
+hidden: naive int8 quantisation collapses the model (8.9% argmax agreement,
+0 of 9 entities found), and the token embedding table is 66% of the artifact.
 
 ## Status
 
-Working pipeline (detect → explain → redact → vault → reveal → batch →
-audit), 24 tests passing. Roadmap: AI Hub NPU profiling (M2), OCR screenshot
-mode polish.
+Working pipeline (detect → explain → redact → vault → reveal → batch → audit),
+31 tests passing. AI tier exported to ONNX, verified, and benchmarked; NPU
+compile/profile is one token away. Roadmap: Hexagon profile numbers, embedding
+vocabulary pruning, OCR screenshot mode polish.
 
 ## License / ownership
 

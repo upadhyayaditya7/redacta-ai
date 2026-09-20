@@ -8,10 +8,15 @@ venv/
 .env
 .vscode/
 
-# Model weights (never commit)
+# Model weights (never commit — regenerate with models/export_ai_hub.py)
 models/*.onnx
 models/*.bin
 models/*.safetensors
+models/onnx/
+
+# Hugging Face / ONNX caches
+.cache/
+*.onnx.data
 
 # Generated demo data & redacted outputs
 data/

@@ -1,0 +1,17 @@
+# Redacta AI — optional AI + NPU stack
+#
+# Installs the GLiNER PII detector and the ONNX/AI Hub toolchain used to compile
+# and profile it for a Snapdragon X Hexagon NPU.
+#
+#   pip install -r requirements-ai.txt
+#
+# Verified on Python 3.14 / torch 2.13 / gliner 0.2.29 / qai-hub 0.55.
+# The product still runs regex-only if this is never installed.
+
+gliner>=0.2.29        # zero-shot PII NER (pulls torch); names, orgs, locations
+torch>=2.4            # GLiNER runtime + ONNX tracing backend
+onnxruntime>=1.20     # serves the exported graph — the on-device inference path
+onnx>=1.17            # required by the torchscript ONNX exporter
+numpy>=1.26
+huggingface-hub>=0.24
+qai-hub>=0.55         # Qualcomm AI Hub: compile + profile for Hexagon NPU

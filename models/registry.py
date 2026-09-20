@@ -23,10 +23,14 @@ MODELS: dict[str, ModelSpec] = {
     "gliner_pii": ModelSpec(
         name="urchade/gliner_multi_pii-v1",
         role="Zero-shot PII NER: names, locations, organisations, DOB",
-        runtime="PyTorch (dev) → ONNX Runtime (Windows) → QNN/Hexagon NPU (target)",
-        ai_hub_target="ONNX export → QNN context binary (via qai-hub export)",
+        runtime="ONNX Runtime (shipped) → QNN/Hexagon NPU (compile pending token)",
+        ai_hub_target="ONNX export → QNN context binary (via models/export_ai_hub.py)",
         optional=True,
-        notes="Apache-2.0. Multilingual (8 languages incl. Indian naming).",
+        notes=(
+            "Apache-2.0. Multilingual (8 languages incl. Indian naming). 289M params; "
+            "1157 MB fp32 ONNX, of which 768 MB is the 250k-token embedding table. "
+            "Dynamic int8 is NOT usable (8.9% argmax agreement) — see benchmarks/npu.md."
+        ),
     ),
     "ocr": ModelSpec(
         name="Tesseract 5 (or docTR)",

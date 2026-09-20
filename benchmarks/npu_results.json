@@ -1,0 +1,131 @@
+{
+  "cpu": [
+    {
+      "file": "model.onnx",
+      "size_mb": 1157.1,
+      "runs": 12,
+      "mean_ms": 443.7,
+      "median_ms": 446.7,
+      "p95_ms": 458.6,
+      "min_ms": 423.4,
+      "docs_per_s": 2.3,
+      "input_shapes": {
+        "input_ids": [
+          1,
+          245
+        ],
+        "attention_mask": [
+          1,
+          245
+        ],
+        "words_mask": [
+          1,
+          245
+        ],
+        "text_lengths": [
+          1,
+          1
+        ],
+        "span_idx": [
+          1,
+          1548,
+          2
+        ],
+        "span_mask": [
+          1,
+          1548
+        ]
+      }
+    }
+  ],
+  "verification": [
+    {
+      "label": "organization",
+      "text": "State Bank of India, Pune Main Branch",
+      "score": 0.728,
+      "start": 20,
+      "end": 57
+    },
+    {
+      "label": "person",
+      "text": "Ananya Nair",
+      "score": 0.998,
+      "start": 76,
+      "end": 87
+    },
+    {
+      "label": "phone number",
+      "text": "+91 8409150555",
+      "score": 0.997,
+      "start": 160,
+      "end": 174
+    },
+    {
+      "label": "email",
+      "text": "ananya757@gmail.com",
+      "score": 0.999,
+      "start": 184,
+      "end": 203
+    },
+    {
+      "label": "email",
+      "text": "ananya42@okicici",
+      "score": 0.713,
+      "start": 211,
+      "end": 227
+    },
+    {
+      "label": "date of birth",
+      "text": "14/03/1996",
+      "score": 0.998,
+      "start": 245,
+      "end": 255
+    },
+    {
+      "label": "person",
+      "text": "Rohan Nair",
+      "score": 0.973,
+      "start": 321,
+      "end": 331
+    },
+    {
+      "label": "person",
+      "text": "Meera Iyer",
+      "score": 0.968,
+      "start": 356,
+      "end": 366
+    },
+    {
+      "label": "organization",
+      "text": "HDFC Bank Ltd.",
+      "score": 0.953,
+      "start": 368,
+      "end": 382
+    }
+  ],
+  "regex": {
+    "mean_ms": 0.27,
+    "p95_ms": 0.32,
+    "docs_per_s": 3658.7
+  },
+  "int8_quality": {
+    "Logits cosine similarity": "0.9576",
+    "Logits max absolute difference": 54.91,
+    "Argmax agreement": "8.9%",
+    "Entities detected (fp32)": 9,
+    "Entities detected (int8)": 0,
+    "Missing after int8": "+91 8409150555, 14/03/1996, Ananya Nair, HDFC Bank Ltd., Meera Iyer, Rohan Nair, State Bank of India, Pune Main Branch, ananya42@okicici, ananya757@gmail.com",
+    "Size (fp32 -> int8)": "1157 MB -> 349 MB"
+  },
+  "pipeline": {
+    "doc_chars": 419,
+    "runs": 5,
+    "cold_start_ms": 5286.2,
+    "mean_ms": 284.7,
+    "p95_ms": 287.9,
+    "regex_ms": 0.38,
+    "ner_ms": 281.8,
+    "backend": "onnx",
+    "spans": 11
+  }
+}

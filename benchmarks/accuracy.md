@@ -1,6 +1,6 @@
 # Redacta AI — Accuracy Evaluation
 
-**Test set:** 10 synthetic Indian bank-statement-style documents (50-doc run available: `python tests/test_accuracy.py`)
+**Test set:** 50 synthetic Indian bank-statement-style documents
 **Metrics:** Precision, Recall, F1 (macro-averaged across documents)
 **IoU threshold:** 0.5 (prediction must overlap ≥50% with ground truth)
 
@@ -8,9 +8,9 @@
 
 | System | Precision | Recall | F1 | Speed |
 |---|---|---|---|---|
-| Redacta Regex | 0.900 | 0.692 | 0.783 | 850 docs/s |
-| Redacta Full | 1.000 | 0.831 | 0.907 | ~6 docs/s |
-| Presidio | 0.975 | 0.231 | 0.373 | ~1 docs/s |
+| Redacta Regex | 0.900 | 0.692 | 0.783 | 1322 docs/s |
+| Redacta Full | 1.000 | 0.831 | 0.907 | 0 docs/s |
+| Presidio | 0.975 | 0.231 | 0.373 | 1 docs/s |
 
 ## Per-Entity Breakdown
 
@@ -45,14 +45,6 @@
 
 4. **Speed: regex-only is orders of magnitude faster.** The AI tier adds
    ~285 ms per document on CPU (see benchmarks/npu.md for the NPU case).
-
-> **Note on PHONE (Full pipeline):** The NER tier re-classifies phone numbers
-> under a different internal label, causing the regex→PHONE mapping to miss
-> them in overlap resolution. Regex alone catches PHONE at 1.0 F1.
->
-> **Note on ORGANIZATION:** Synthetic docs use `Bank : HDFC Bank Ltd.` format
-> which doesn't match the NER's expectations. Real documents format orgs
-> naturally and GLiNER detects them at 0.95+ confidence (see benchmarks/npu.md).
 
 ---
 

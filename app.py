@@ -101,10 +101,11 @@ def cmd_redact(args) -> int:
         for token in result.token_map:
             print(f"  {token}  hint: {vault.entry_hint(token) if vault else '••••'}")
     if args.audit_report != "none":
-        from core.audit import build_record
+        from core.audit import _sha256, build_record
         rec = build_record(
             source=str(args.file), report=report, result=result,
             vault_hints={t: vault.entry_hint(t) for t in result.token_map} if vault else None,
+            sha256_hex=_sha256(src),
         )
         rp = _report_path(args, out)
         rp.write_text(rec.to_json(), encoding="utf-8")

@@ -91,3 +91,63 @@ def test_inspect_onnx_reports_structure(tmp_path):
 def test_risky_ops_are_the_known_qnn_blockers():
     """Guard the list that drives the report's lowering-risk section."""
     assert "NonZero" in ex.RISKY_OPS and "If" in ex.RISKY_OPS
+
+
+def _fake_session_feeds():
+    """The graph's real input names/dtypes without loading the 1.16 GB model."""
+    from types import SimpleNamespace
+
+    class Arr:
+        def __init__(self, shape, dtype):
+            self.shape, self.dtype = shape, dtype
+
+    names = [
+        ("input_ids", (1, 245), "int64"),
+        ("attention_mask", (1, 245), "int64"),
+        ("span_idx", (1, 1548, 2), "int64"),
+        ("span_mask", (1, 1548), "int64"),
+    ]
+    session = SimpleNamespace(get_inputs=lambda: [SimpleNamespace(name=n) for n, _, _ in names])
+    feeds = {n: Arr(s, d) for n, s, d in names}
+    return session, feeds
+
+
+def test_input_specs_use_shape_and_dtype_tuples():
+    """Regression: TensorSpec NamedTuples failed AI Hub's InputSpecs contract.
+
+    The service rejected job j5wl8r84p with "dynamic shapes" because
+    ``TensorSpec(name, dtype, shape)`` puts a *string* at ``spec[0]``, so
+    the serializer saw no shape at all.  Every value must be
+    ``((dim, ...), dtype)`` with concrete dims >= 1.
+    """
+    session, feeds = _fake_session_feeds()
+    specs = ex._input_specs(feeds, session)
+    assert set(specs) == {"input_ids", "attention_mask", "span_idx", "span_mask"}
+    for name, spec in specs.items():
+        assert isinstance(spec, tuple) and len(spec) == 2, f"{name}: expected (shape, dtype)"
+        shape, dtype = spec
+        assert isinstance(shape, tuple) and all(isinstance(d, int) and d >= 1 for d in shape)
+        assert isinstance(dtype, str) and dtype
+        # dtype must be the numpy/ONNX string, not a repr() or TensorSpec
+        assert " " not in dtype and "TensorSpec" not in dtype
+
+
+def test_input_specs_serialize_with_real_dtypes():
+    """Round-trip through qai_hub's own serializer: int64 must stay int64.
+
+    The shape-only shorthand silently defaults dtype to float32 — which
+    would mis-type every input of this all-int64 graph.
+    """
+    api_utils = pytest.importorskip("qai_hub.api_utils")
+    session, feeds = _fake_session_feeds()
+    specs = ex._input_specs(feeds, session)
+    pb = api_utils.input_shapes_to_tensor_type_list_pb(specs)
+    got = {t.name: (tuple(t.tensor_type.shape), t.tensor_type.dtype) for t in pb.types}
+    assert got["input_ids"][0] == (1, 245)
+    assert got["span_idx"][0] == (1, 1548, 2)
+    # int64 must serialize to the int64 enum, not the shape-only
+    # shorthand's float32 default
+    int64 = api_utils.get_type_value_from_str("int64")
+    float32 = api_utils.get_type_value_from_str("float32")
+    assert int64 != float32
+    assert got["input_ids"][1] == int64

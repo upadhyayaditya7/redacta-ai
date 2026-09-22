@@ -454,15 +454,22 @@ def _input_specs(feeds: dict[str, Any], session: Any) -> dict[str, Any]:
     """Pin the graph's dynamic axes to the representative document's shapes.
 
     AI Hub compiles fastest (and QNN lowers most reliably) against static
-    shapes, so we replace the traced ``?`` dimensions with concrete sizes.
-    """
-    import qai_hub as hub  # noqa: PLC0415
+    shapes, so we replace the traced ``?" dimensions with concrete sizes.
 
+    Contract (``qai_hub.InputSpecs``): ``{name: (shape, dtype)}``.  Both the
+    ``(shape, dtype)`` and shape-only forms validate, but the shape-only
+    shorthand makes the client's serializer assume ``float32`` — and every
+    input of this graph is ``int64``.  An earlier revision passed
+    ``TensorSpec`` NamedTuples instead, whose ``spec[0]`` is the input
+    *name*, so no shape ever reached the service and the compile job was
+    rejected with ``Model input 'input_ids' has dynamic shapes``.
+    """
     specs: dict[str, Any] = {}
     for target in session.get_inputs():
         array = feeds[target.name]
-        specs[target.name] = hub.TensorSpec(
-            target.name, str(array.dtype), tuple(int(d) for d in array.shape)
+        specs[target.name] = (
+            tuple(int(d) for d in array.shape),
+            str(array.dtype),
         )
     return specs
 

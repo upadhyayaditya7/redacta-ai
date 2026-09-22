@@ -151,3 +151,58 @@ def test_input_specs_serialize_with_real_dtypes():
     float32 = api_utils.get_type_value_from_str("float32")
     assert int64 != float32
     assert got["input_ids"][1] == int64
+
+
+def _tiny_int64_reducemax(tmp_path):
+    """The smallest graph that reproduces HTP's rejected op (error 3110)."""
+    onnx = pytest.importorskip("onnx")
+    from onnx import TensorProto, helper  # noqa: PLC0415
+
+    inp = helper.make_tensor_value_info("x", TensorProto.INT64, [3])
+    out = helper.make_tensor_value_info("y", TensorProto.INT64, [])
+    reduce_node = helper.make_node(
+        "ReduceMax", ["x"], ["y"], name="/core/ReduceMax", keepdims=0
+    )
+    graph = helper.make_graph([reduce_node], "tiny", [inp], [out])
+    model = helper.make_model(
+        graph, opset_imports=[helper.make_opsetid("", 19)]
+    )
+    model.ir_version = 10
+    path = tmp_path / "tiny.onnx"
+    onnx.save(model, str(path))
+    return path
+
+
+def test_htp_pass_wraps_int64_reducemax(tmp_path):
+    """Every int64 ReduceMax HTP rejected must be wrapped in fp32 casts."""
+    onnx = pytest.importorskip("onnx")
+    src = _tiny_int64_reducemax(tmp_path)
+    dst = tmp_path / "tiny_htp.onnx"
+
+    stats = ex.make_htp_compatible(src, dst)
+
+    assert stats["rewritten"] == ["/core/ReduceMax"]
+    fixed = onnx.load(str(dst))
+    onnx.checker.check_model(fixed)
+    assert [n.op_type for n in fixed.graph.node] == ["Cast", "ReduceMax", "Cast"]
+    # The wrapper restores int64, so consumers still see the old dtype.
+    assert any(
+        v.name == "y" and v.type.tensor_type.elem_type == 7
+        for v in fixed.graph.output
+    )
+
+
+def test_htp_pass_preserves_outputs_bitwise(tmp_path):
+    """Cast(fp32)->ReduceMax->Cast(int64) must not change a single value."""
+    ort = pytest.importorskip("onnxruntime")
+    numpy = pytest.importorskip("numpy")
+
+    src = _tiny_int64_reducemax(tmp_path)
+    dst = tmp_path / "tiny_htp.onnx"
+    ex.make_htp_compatible(src, dst)
+
+    data = numpy.array([3, 40, 7], dtype=numpy.int64)
+    before = ort.InferenceSession(str(src)).run(None, {"x": data})[0]
+    after = ort.InferenceSession(str(dst)).run(None, {"x": data})[0]
+    assert before == after == 40
+    assert before.dtype == after.dtype == numpy.int64

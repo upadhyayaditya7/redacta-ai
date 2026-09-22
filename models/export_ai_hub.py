@@ -474,6 +474,81 @@ def _input_specs(feeds: dict[str, Any], session: Any) -> dict[str, Any]:
     return specs
 
 
+def make_htp_compatible(onnx_file: Path, out_file: Path) -> dict[str, Any]:
+    """Cast int64 ``ReduceMax`` nodes to fp32 so the HTP backend accepts them.
+
+    Profile job ``jgzlnjno5`` died on device with ``Failed to finalize QNN
+    graph`` (error 6000) after the backend rejected every ``ReduceMax`` over
+    an ``int64`` tensor (``backendValidateOpConfig ... error 3110``): the
+    GLiNER export reduces ``text_lengths`` and an integer mask sum, and
+    Hexagon's HTP does not implement integer reductions.  (The control-flow
+    ops the report flags as risky — ``If``, ``NonZero``, ``ScatterND`` —
+    converted fine; the observed blocker was the dtype, not the structure.)
+
+    The wrapper casts to fp32, reduces, and casts back, which is numerically
+    exact for values below 2**24 (word/sequence counts) and invisible to
+    consumers: the original output name, dtype and shape are all preserved.
+
+    Returns a summary of what was rewritten (recorded in npu_results.json).
+    """
+    import onnx  # noqa: PLC0415
+    from onnx import TensorProto, helper, shape_inference  # noqa: PLC0415
+
+    model = shape_inference.infer_shapes(onnx.load(str(onnx_file)))
+    graph = model.graph
+
+    def elem_type(name: str) -> int | None:
+        for value in list(graph.input) + list(graph.value_info) + list(graph.output):
+            if value.name == name:
+                return value.type.tensor_type.elem_type
+        for init in graph.initializer:
+            if init.name == name:
+                return init.data_type
+        return None
+
+    rewritten: list[str] = []
+    patched: list[Any] = []
+    for index, node in enumerate(graph.node):
+        if (
+            node.op_type == "ReduceMax"
+            and node.input
+            and elem_type(node.input[0]) == TensorProto.INT64
+        ):
+            label = node.name or f"ReduceMax_{index}"
+            src, orig_out = node.input[0], node.output[0]
+            mid_in, mid_out = f"{label}_fp32in", f"{label}_fp32out"
+            node.input[0] = mid_in
+            node.output[0] = mid_out
+            patched.append(
+                helper.make_node(
+                    "Cast", [src], [mid_in], name=f"{label}_as_f32",
+                    to=TensorProto.FLOAT,
+                )
+            )
+            patched.append(node)
+            patched.append(
+                helper.make_node(
+                    "Cast", [mid_out], [orig_out], name=f"{label}_as_i64",
+                    to=TensorProto.INT64,
+                )
+            )
+            rewritten.append(label)
+        else:
+            patched.append(node)
+
+    graph.ClearField("node")
+    graph.node.extend(patched)
+    model = shape_inference.infer_shapes(model)
+    onnx.checker.check_model(model)
+    onnx.save(model, str(out_file))
+    return {
+        "rewritten": rewritten,
+        "source": _rel(onnx_file),
+        "target": _rel(out_file),
+        "size_mb": round(out_file.stat().st_size / 1e6, 1),
+    }
+
+
 def submit_ai_hub(
     onnx_file: Path,
     device_name: str = DEFAULT_DEVICE,
@@ -551,13 +626,11 @@ def submit_ai_hub(
 
     if run_inference:
         try:
-            session_opts = {"device": device}
             inference_job = hub.submit_inference_job(
                 model=target_model,
                 device=device,
                 name=f"{JOB_NAME}-inference",
                 inputs=feeds,
-                **session_opts,
             )
             inference_job.wait()
             result["inference_job_url"] = str(inference_job.url)
@@ -903,6 +976,11 @@ def main() -> None:
     parser.add_argument("--submit", action="store_true", help="compile + profile on AI Hub")
     parser.add_argument("--report", action="store_true", help="regenerate benchmarks/npu.md")
     parser.add_argument(
+        "--fix-htp",
+        action="store_true",
+        help="wrap int64 ReduceMax in fp32 casts (required for HTP finalize)",
+    )
+    parser.add_argument(
         "--int8-check",
         action="store_true",
         help="measure how much dynamic int8 quantisation degrades the model",
@@ -944,6 +1022,7 @@ def main() -> None:
         args.submit,
         args.report,
         args.int8_check,
+        args.fix_htp,
     ]
     if not any(actions):
         parser.print_help()
@@ -996,6 +1075,20 @@ def main() -> None:
         for name in list_devices(args.pattern):
             print(" ", name)
 
+    if args.fix_htp:
+        src = args.out_dir / "model.onnx"
+        if not src.exists():
+            raise SystemExit(f"no export at {src} - run `--export` first")
+        dst = args.out_dir / "model_htp.onnx"
+        stats = make_htp_compatible(src, dst)
+        results = _load_results()
+        results["htp_graph_pass"] = stats
+        _save_results(results)
+        print(f"rewrote {len(stats['rewritten'])} int64 ReduceMax node(s):")
+        for name in stats["rewritten"]:
+            print(f"  - {name}  (cast -> fp32, reduce, cast -> int64)")
+        print(f"{stats['size_mb']} MB -> {dst}")
+
     if args.submit:
         ready, why = hub_ready()
         if not ready:
@@ -1005,7 +1098,9 @@ def main() -> None:
             )
         from gliner import GLiNER  # noqa: PLC0415
 
-        onnx_file = args.out_dir / "model.onnx"
+        onnx_file = args.out_dir / "model_htp.onnx"
+        if not onnx_file.exists():
+            onnx_file = args.out_dir / "model.onnx"
         if not onnx_file.exists():
             raise SystemExit(f"no export at {onnx_file} - run `--all` first")
 

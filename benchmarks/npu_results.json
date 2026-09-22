@@ -3,12 +3,12 @@
     {
       "file": "model.onnx",
       "size_mb": 1157.1,
-      "runs": 12,
-      "mean_ms": 443.7,
-      "median_ms": 446.7,
-      "p95_ms": 458.6,
-      "min_ms": 423.4,
-      "docs_per_s": 2.3,
+      "runs": 20,
+      "mean_ms": 351.3,
+      "median_ms": 348.9,
+      "p95_ms": 400.8,
+      "min_ms": 303.9,
+      "docs_per_s": 2.8,
       "input_shapes": {
         "input_ids": [
           1,
@@ -127,5 +127,53 @@
     "ner_ms": 281.8,
     "backend": "onnx",
     "spans": 11
+  },
+  "ai_hub": {
+    "device": "Snapdragon X Elite CRD",
+    "source_model": "models\\onnx\\model.onnx",
+    "source_size_mb": 1157.1,
+    "pinned_input_shapes": {
+      "input_ids": [
+        1,
+        245
+      ],
+      "attention_mask": [
+        1,
+        245
+      ],
+      "words_mask": [
+        1,
+        245
+      ],
+      "text_lengths": [
+        1,
+        1
+      ],
+      "span_idx": [
+        1,
+        1548,
+        2
+      ],
+      "span_mask": [
+        1,
+        1548
+      ]
+    },
+    "compile_job_url": "https://workbench.aihub.qualcomm.com/jobs/jpvl7r7k5/",
+    "compile_status": "JobStatus\n---------\ncode    : SUCCESS\nmessage : \n",
+    "target_model": "mqvozelxm",
+    "profile_job_url": "https://workbench.aihub.qualcomm.com/jobs/jgzlnjno5/",
+    "profile_status": "JobStatus\n---------\ncode    : FAILED\nmessage : Failed to profile the model: Failed to finalize QNN graph.\n",
+    "raw_profile": {},
+    "inference_error": "TypeError: qai_hub.client.Client.submit_inference_job() got multiple values for keyword argument 'device'"
+  },
+  "htp_graph_pass": {
+    "rewritten": [
+      "/core/ReduceMax",
+      "/core/ReduceMax_1"
+    ],
+    "source": "models\\onnx\\model.onnx",
+    "target": "models\\onnx\\model_htp.onnx",
+    "size_mb": 1157.6
   }
 }

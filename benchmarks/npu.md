@@ -7,7 +7,7 @@ or fetched from a real Qualcomm AI Hub job. Nothing is estimated.
 
 | Model graph | Runtime | Mean | p95 | Docs/s | Artifact size |
 |---|---|---|---|---|---|
-| GLiNER-PII (model.onnx) | ONNX Runtime, CPU | 443.7 ms | 458.6 ms | 2.3 | 1157.1 MB |
+| GLiNER-PII (model.onnx) | ONNX Runtime, CPU | 351.3 ms | 400.8 ms | 2.8 | 1157.1 MB |
 | GLiNER-PII (QNN context binary) | Hexagon NPU | PENDING | - | - | - |
 
 ## 1b. End-to-end product latency (what a user waits for)

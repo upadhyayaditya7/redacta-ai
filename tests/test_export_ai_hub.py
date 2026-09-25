@@ -206,3 +206,103 @@ def test_htp_pass_preserves_outputs_bitwise(tmp_path):
     after = ort.InferenceSession(str(dst)).run(None, {"x": data})[0]
     assert before == after == 40
     assert before.dtype == after.dtype == numpy.int64
+
+
+def _tiny_span_einsum(tmp_path):
+    """Build a tiny graph with GLiNER's span Einsum: BLKD,BCD->BLKC."""
+    import numpy
+    import onnx
+    from onnx import TensorProto, helper
+
+    a = helper.make_tensor_value_info("a", TensorProto.FLOAT, [1, 2, 3, 3])
+    b = helper.make_tensor_value_info("b", TensorProto.FLOAT, [1, 2, 3])
+    y = helper.make_tensor_value_info("y", TensorProto.FLOAT, [1, 2, 3, 2])
+    einsum = helper.make_node(
+        "Einsum", ["a", "b"], ["y"], name="/core/Einsum",
+        equation="BLKD,BCD->BLKC",
+    )
+    graph = helper.make_graph(
+        [einsum], "tiny",
+        [a, b], [y],
+        initializer=[
+            helper.make_tensor(
+                "a_init", TensorProto.FLOAT, [1, 2, 3, 3],
+                numpy.arange(18, dtype=numpy.float32),
+            ),
+            helper.make_tensor(
+                "b_init", TensorProto.FLOAT, [1, 2, 3],
+                numpy.array([1.0, 0.5, -2.0, 2.0, -1.0, 0.25], dtype=numpy.float32),
+            ),
+        ],
+    )
+    model = helper.make_model(graph, opset_imports=[helper.make_opsetid("", 19)])
+    model.ir_version = 10
+    path = tmp_path / "tiny_einsum.onnx"
+    onnx.save(model, str(path))
+    return path
+
+
+def test_einsum_pass_rewrites_span_einsum(tmp_path):
+    """The QAIRT converter rejects BLKD,BCD->BLKC; it must become MatMul."""
+    onnx = pytest.importorskip("onnx")
+    src = _tiny_span_einsum(tmp_path)
+    dst = tmp_path / "tiny_einsum_htp.onnx"
+
+    stats = ex.rewrite_einsum_for_htp(src, dst)
+
+    assert stats["rewritten"] == ["/core/Einsum"]
+    fixed = onnx.load(str(dst))
+    onnx.checker.check_model(fixed)
+    assert [n.op_type for n in fixed.graph.node] == ["Transpose", "MatMul"]
+    transpose = fixed.graph.node[0]
+    perm = next(a for a in transpose.attribute if a.name == "perm")
+    assert list(perm.ints) == [0, 2, 1]
+    matmul = fixed.graph.node[1]
+    assert matmul.input == ["a", "/core/Einsum_wT"]
+    assert matmul.output == ["y"]
+
+
+def test_einsum_pass_preserves_outputs(tmp_path):
+    """Transpose+MatMul must compute the same span scores as the Einsum."""
+    ort = pytest.importorskip("onnxruntime")
+    numpy = pytest.importorskip("numpy")
+
+    src = _tiny_span_einsum(tmp_path)
+    dst = tmp_path / "tiny_einsum_htp.onnx"
+    ex.rewrite_einsum_for_htp(src, dst)
+
+    feeds = {
+        "a": numpy.arange(18, dtype=numpy.float32).reshape(1, 2, 3, 3),
+        "b": numpy.array(
+            [[[1.0, 0.5, -2.0], [2.0, -1.0, 0.25]]], dtype=numpy.float32
+        ),
+    }
+    before = ort.InferenceSession(str(src)).run(None, feeds)[0]
+    after = ort.InferenceSession(str(dst)).run(None, feeds)[0]
+    assert before.shape == after.shape == (1, 2, 3, 2)
+    assert before.dtype == after.dtype == numpy.float32
+    numpy.testing.assert_allclose(before, after, rtol=0, atol=1e-6)
+
+
+def test_einsum_pass_leaves_other_equations_alone(tmp_path):
+    """Only GLiNER's span equation gets rewritten; others pass through."""
+    import onnx
+    from onnx import TensorProto, helper
+
+    x = helper.make_tensor_value_info("x", TensorProto.FLOAT, [2, 3])
+    y = helper.make_tensor_value_info("y", TensorProto.FLOAT, [3])
+    einsum = helper.make_node(
+        "Einsum", ["x"], ["y"], name="/other/Einsum", equation="ij->j"
+    )
+    graph = helper.make_graph([einsum], "tiny", [x], [y])
+    model = helper.make_model(graph, opset_imports=[helper.make_opsetid("", 19)])
+    model.ir_version = 10
+    src = tmp_path / "other.onnx"
+    onnx.save(model, str(src))
+    dst = tmp_path / "other_htp.onnx"
+
+    stats = ex.rewrite_einsum_for_htp(src, dst)
+
+    assert stats["rewritten"] == []
+    fixed = onnx.load(str(dst))
+    assert [n.op_type for n in fixed.graph.node] == ["Einsum"]

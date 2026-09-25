@@ -549,6 +549,73 @@ def make_htp_compatible(onnx_file: Path, out_file: Path) -> dict[str, Any]:
     }
 
 
+def rewrite_einsum_for_htp(onnx_file: Path, out_file: Path) -> dict[str, Any]:
+    """Rewrite the 4-D span Einsum as Transpose + MatMul for the QAIRT converter.
+
+    Compiling a QNN context binary (``--target_runtime precompiled_qnn_onnx``)
+    routes the graph through the QAIRT ONNX converter, which refuses GLiNER's
+    span-score Einsum (compile job ``jgzlzyl65``: ``Einsum equation :
+    BLKD,BCD->BLKC ... is not implemented currently``).  The default compile
+    path (job ``jgnz1qovg``) never runs that converter, which is why it
+    succeeds where the context-binary path fails.
+
+    ``BLKD,BCD->BLKC`` is exactly a batched matmul: transpose the second
+    operand from ``[B,C,D]`` to ``[B,D,C]`` and MatMul against ``[B,L,K,D]``.
+    Same reduction, same dtype, no approximation.  The original output name,
+    shape and dtype are preserved.
+
+    Returns a summary of what was rewritten (recorded in npu_results.json).
+    """
+    import onnx  # noqa: PLC0415
+    from onnx import helper, shape_inference  # noqa: PLC0415
+
+    model = shape_inference.infer_shapes(onnx.load(str(onnx_file)))
+    graph = model.graph
+
+    rewritten: list[str] = []
+    patched: list[Any] = []
+    for node in graph.node:
+        if node.op_type != "Einsum":
+            patched.append(node)
+            continue
+        equation = ""
+        for attr in node.attribute:
+            if attr.name == "equation":
+                equation = attr.s.decode()
+        if equation.replace(" ", "") != "BLKD,BCD->BLKC":
+            patched.append(node)  # leave unknown equations untouched
+            continue
+        label = node.name or "Einsum"
+        a_in, b_in = node.input[0], node.input[1]
+        orig_out = node.output[0]
+        wt_out = f"{label}_wT"
+        patched.append(
+            helper.make_node(
+                "Transpose", [b_in], [wt_out],
+                name=f"{label}_transpose", perm=[0, 2, 1],
+            )
+        )
+        patched.append(
+            helper.make_node(
+                "MatMul", [a_in, wt_out], [orig_out], name=f"{label}_matmul",
+            )
+        )
+        rewritten.append(label)
+
+    if rewritten:
+        graph.ClearField("node")
+        graph.node.extend(patched)
+        model = shape_inference.infer_shapes(model)
+        onnx.checker.check_model(model)
+    onnx.save(model, str(out_file))
+    return {
+        "rewritten": rewritten,
+        "source": _rel(onnx_file),
+        "target": _rel(out_file),
+        "size_mb": round(out_file.stat().st_size / 1e6, 1),
+    }
+
+
 def submit_ai_hub(
     onnx_file: Path,
     device_name: str = DEFAULT_DEVICE,
@@ -981,6 +1048,11 @@ def main() -> None:
         help="wrap int64 ReduceMax in fp32 casts (required for HTP finalize)",
     )
     parser.add_argument(
+        "--fix-einsum",
+        action="store_true",
+        help="rewrite the span Einsum as Transpose+MatMul (required for QAIRT context-binary compile)",
+    )
+    parser.add_argument(
         "--int8-check",
         action="store_true",
         help="measure how much dynamic int8 quantisation degrades the model",
@@ -1023,6 +1095,7 @@ def main() -> None:
         args.report,
         args.int8_check,
         args.fix_htp,
+        args.fix_einsum,
     ]
     if not any(actions):
         parser.print_help()
@@ -1089,6 +1162,22 @@ def main() -> None:
             print(f"  - {name}  (cast -> fp32, reduce, cast -> int64)")
         print(f"{stats['size_mb']} MB -> {dst}")
 
+    if args.fix_einsum:
+        src = args.out_dir / "model_htp.onnx"
+        if not src.exists():
+            src = args.out_dir / "model.onnx"
+        if not src.exists():
+            raise SystemExit(f"no export at {args.out_dir} - run `--export` first")
+        dst = args.out_dir / "model_einsum.onnx"
+        stats = rewrite_einsum_for_htp(src, dst)
+        results = _load_results()
+        results["einsum_graph_pass"] = stats
+        _save_results(results)
+        print(f"rewrote {len(stats['rewritten'])} Einsum node(s) as Transpose+MatMul:")
+        for name in stats["rewritten"]:
+            print(f"  - {name}  (BLKD,BCD->BLKC == MatMul(B, LKD, DC))")
+        print(f"{stats['size_mb']} MB -> {dst}")
+
     if args.submit:
         ready, why = hub_ready()
         if not ready:
@@ -1098,7 +1187,9 @@ def main() -> None:
             )
         from gliner import GLiNER  # noqa: PLC0415
 
-        onnx_file = args.out_dir / "model_htp.onnx"
+        onnx_file = args.out_dir / "model_einsum.onnx"
+        if not onnx_file.exists():
+            onnx_file = args.out_dir / "model_htp.onnx"
         if not onnx_file.exists():
             onnx_file = args.out_dir / "model.onnx"
         if not onnx_file.exists():

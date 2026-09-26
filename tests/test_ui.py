@@ -15,7 +15,8 @@ from streamlit.testing.v1 import AppTest
 
 
 def test_studio_end_to_end() -> None:
-    at = AppTest.from_file("frontend/app.py", default_timeout=30)
+    app_path = Path(__file__).resolve().parents[1] / "frontend" / "app.py"
+    at = AppTest.from_file(str(app_path), default_timeout=30)
     at.run()
     assert not at.exception, f"App raised on boot: {at.exception}"
 

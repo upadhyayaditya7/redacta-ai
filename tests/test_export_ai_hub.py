@@ -286,7 +286,7 @@ def test_einsum_pass_preserves_outputs(tmp_path):
 
 def test_einsum_pass_leaves_other_equations_alone(tmp_path):
     """Only GLiNER's span equation gets rewritten; others pass through."""
-    import onnx
+    onnx = pytest.importorskip("onnx")
     from onnx import TensorProto, helper
 
     x = helper.make_tensor_value_info("x", TensorProto.FLOAT, [2, 3])

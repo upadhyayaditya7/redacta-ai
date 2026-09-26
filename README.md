@@ -8,8 +8,8 @@ was made, and redacts it — either permanently, or *reversibly* into a local
 encrypted vault only your passphrase can open.
 
 Built for the **Snapdragon® AI Lab Build & Present Challenge** — designed to run
-entirely on-device, with the AI model compiled for the **Hexagon NPU** of
-Snapdragon X-powered HP PCs via **Qualcomm AI Hub**.
+entirely on-device, with the AI model compiled **and executed** on the **Hexagon NPU** of
+Snapdragon X-powered HP PCs via **Qualcomm AI Hub** — measured findings in `benchmarks/npu.md`.
 
 ## Why on-device
 
@@ -58,7 +58,7 @@ python app.py models                          # model stack + AI Hub targets
 streamlit run frontend/app.py                 # the UI
 ```
 
-Tests: `python -m pytest tests -q` (31 passing).
+Tests: `python -m pytest tests -q` (38 passing).
 
 ## Architecture
 
@@ -100,14 +100,14 @@ Measured on CPU (see [`benchmarks/npu.md`](benchmarks/npu.md)): regex tier
 **0.27 ms/doc**, AI tier **~285 ms/doc** warm — which is exactly the case for
 moving the graph onto the HTP. Two findings are recorded there rather than
 hidden: naive int8 quantisation collapses the model (8.9% argmax agreement,
-0 of 9 entities found), and the token embedding table is 66% of the artifact.
+0 of 9 entities found); Hexagon fp16 execution fails the same way (`npu.md` §2b);
 
 ## Status
 
 Working pipeline (detect → explain → redact → vault → reveal → batch → audit),
-31 tests passing. AI tier exported to ONNX, verified, and benchmarked; NPU
-compile/profile is one token away. Roadmap: Hexagon profile numbers, embedding
-vocabulary pruning, OCR screenshot mode polish.
+38 tests passing. AI tier exported to ONNX, verified, benchmarked, compiled to
+a QNN context binary, and executed on the X Elite HTP (findings: `npu.md`).
+Roadmap: NPU-viable detector head, embedding vocabulary pruning, OCR polish.
 
 ## License / ownership
 

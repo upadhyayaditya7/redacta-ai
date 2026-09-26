@@ -1,5 +1,7 @@
 # Redacta AI 🛡️
 
+[![tests](https://github.com/upadhyayaditya7/redacta-ai/actions/workflows/tests.yml/badge.svg)](https://github.com/upadhyayaditya7/redacta-ai/actions/workflows/tests.yml)
+
 **On-device PII detection & redaction for Indian documents — zero cloud, fully explainable.**
 
 Drop a bank statement, ID scan or screenshot. Redacta finds the sensitive data

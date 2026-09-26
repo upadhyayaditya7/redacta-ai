@@ -130,8 +130,8 @@
   },
   "ai_hub": {
     "device": "Snapdragon X Elite CRD",
-    "source_model": "models\\onnx\\model.onnx",
-    "source_size_mb": 1157.1,
+    "source_model": "models\\onnx\\model_htp.onnx",
+    "source_size_mb": 1157.6,
     "pinned_input_shapes": {
       "input_ids": [
         1,
@@ -159,13 +159,13 @@
         1548
       ]
     },
-    "compile_job_url": "https://workbench.aihub.qualcomm.com/jobs/jpvl7r7k5/",
+    "compile_job_url": "https://workbench.aihub.qualcomm.com/jobs/jgnz1qovg/",
     "compile_status": "JobStatus\n---------\ncode    : SUCCESS\nmessage : \n",
-    "target_model": "mqvozelxm",
-    "profile_job_url": "https://workbench.aihub.qualcomm.com/jobs/jgzlnjno5/",
-    "profile_status": "JobStatus\n---------\ncode    : FAILED\nmessage : Failed to profile the model: Failed to finalize QNN graph.\n",
+    "target_model": "mq2651d0n",
+    "profile_job_url": "https://workbench.aihub.qualcomm.com/jobs/jprlxdovp/",
+    "profile_status": "JobStatus\n---------\ncode    : FAILED\nmessage : Failed to profile the model: Non-zero status code returned while running ScatterND node. Name:'/core/ScatterND_1' Status Message: invalid indice found, indice = 0\n",
     "raw_profile": {},
-    "inference_error": "TypeError: qai_hub.client.Client.submit_inference_job() got multiple values for keyword argument 'device'"
+    "inference_error": "UserError: The values in inputs dictionary must be list of numpy arrays with a type in (float16, float32, bool, int8, int16, int32, int64, uint8, uint16)."
   },
   "htp_graph_pass": {
     "rewritten": [
@@ -174,6 +174,14 @@
     ],
     "source": "models\\onnx\\model.onnx",
     "target": "models\\onnx\\model_htp.onnx",
+    "size_mb": 1157.6
+  },
+  "einsum_graph_pass": {
+    "rewritten": [
+      "/core/Einsum"
+    ],
+    "source": "models\\onnx\\model_htp.onnx",
+    "target": "models\\onnx\\model_einsum.onnx",
     "size_mb": 1157.6
   }
 }

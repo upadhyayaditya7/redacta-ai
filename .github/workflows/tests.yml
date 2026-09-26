@@ -1,0 +1,22 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install core dependencies
+        run: pip install -r requirements.txt
+      - name: Run test suite (core, regex-only tier)
+        run: python -m pytest tests -q
+      - name: Smoke: scan the committed sample document
+        run: python app.py scan data/samples/demo.txt --no-ner

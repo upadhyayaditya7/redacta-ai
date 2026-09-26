@@ -1,0 +1,12 @@
+Account Holder : Vivaan Iyer
+Aadhaar        : 625889627482
+PAN            : XICHK1633I
+IFSC           : HDFC0FI2ONE
+Mobile         : +91 9134388133
+Email          : vivaan250@proton.me
+UPI            : vivaan@upi
+Card           : 4768 6267 5480 2631
+DOB            : 14/03/1996
+Date           : 12 Sep 2026
+Balance        : INR 1,42,030.55
+Note           : password: Hunter2026! api_key = sk_test_51Kx9qqAbCdEfGh123456

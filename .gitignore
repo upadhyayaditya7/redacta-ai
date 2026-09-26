@@ -19,7 +19,12 @@ models/onnx/
 *.onnx.data
 
 # Generated demo data & redacted outputs
-data/
+# (`data/samples/demo.txt` is tracked on purpose — see negations below —
+#  so a fresh clone can run the README quickstart immediately.)
+data/*
+!data/samples
+data/samples/*
+!data/samples/demo.txt
 *.redacted.txt
 *.redacted.pdf
 *.redacted.png

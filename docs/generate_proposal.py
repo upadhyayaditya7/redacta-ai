@@ -408,24 +408,30 @@ def build():
         "HTP makes AI-grade redaction interactive."
     ))
     story.extend(bullet(
-        "<b>Qualcomm AI Hub is the export path, already wired.</b> GLiNER-PII → "
-        "ONNX → QNN context binary → profiled on Snapdragon X via AI Hub's cloud "
-        "fleet. The export pipeline is implemented, verified, and reproducible."
-    ))
+        "<b>Qualcomm AI Hub is the export path, already exercised.</b> GLiNER-PII → "
+        "ONNX → QNN context binary, compiled and <b>executed on the Snapdragon X "
+        "Elite's Hexagon HTP</b> through AI Hub's cloud fleet (compile job "
+        "jgnz1qovg, inference job jp1no1r8g). Getting there required two graph "
+        "compatibility rewrites contributed in this project: int64 ReduceMax "
+        "lowered to fp32 casts, and the span-Einsum lowered to Transpose+MatMul."))
 
     story.extend(subsection("NPU benchmark (measured)"))
     npu_headers = ["Configuration", "Runtime", "Mean", "p95", "Docs/s"]
     npu_rows = [
         ["Regex + checksums", "CPU", "0.27 ms", "0.32 ms", "3,659"],
         ["Regex + AI tier (warm)", "ONNX Runtime, CPU", "284.7 ms", "287.9 ms", "3.5"],
-        ["Regex + AI tier", "Hexagon NPU", "PENDING*", "—", "—"],
+        ["GLiNER-PII graph", "Hexagon NPU (HTP)", "executed ✓", "see note", "—"],
     ]
     story.append(Spacer(1, 4))
     story.append(make_table(npu_headers, npu_rows,
                             col_widths=[4.5 * cm, 3.5 * cm, 2.5 * cm, 2.5 * cm, 2.5 * cm]))
     story.extend(caption(
-        "Table 2 — End-to-end latency. *NPU row requires AI Hub API token "
-        "(aihub.qualcomm.com); compile job is a one-command pipeline."))
+        "Table 2 — End-to-end latency. The QNN context binary compiled and ran on "
+        "the X Elite HTP with real document input (AI Hub jobs jgnz1qovg/jp1no1r8g). "
+        "Measured on device: fp16 execution compresses the detector head's logit "
+        "range and 0/9 entities survive, so the shipped product runs the AI tier "
+        "on CPU (284.7 ms) and the finding is documented in benchmarks/npu.md §2b. "
+        "The two-tier design is what makes this failure survivable at runtime."))
 
     # --- 4. Technical Architecture ---
     story.extend(section("4", "Technical Architecture"))

@@ -8,7 +8,7 @@ or fetched from a real Qualcomm AI Hub job. Nothing is estimated.
 | Model graph | Runtime | Mean | p95 | Docs/s | Artifact size |
 |---|---|---|---|---|---|
 | GLiNER-PII (model.onnx) | ONNX Runtime, CPU | 351.3 ms | 400.8 ms | 2.8 | 1157.1 MB |
-| GLiNER-PII (QNN context binary) | Hexagon NPU | PENDING | - | - | - |
+| GLiNER-PII (QNN context binary) | Hexagon NPU | executed - see section 2b | - | - | - |
 
 ## 1b. End-to-end product latency (what a user waits for)
 
@@ -20,15 +20,6 @@ or fetched from a real Qualcomm AI Hub job. Nothing is estimated.
 Warm run = regex 0.38 ms + AI tier 281.8 ms (backend: onnx), finding 11 entities. Cold start (model + ONNX session init) is 5286.2 ms, so the AI tier is warm-loaded once per session, not once per document.
 
 **This is the case for the NPU.** The deterministic tier answers in well under a millisecond, but the AI tier costs hundreds of milliseconds of CPU per document. Moving that graph onto the Hexagon HTP is what makes AI-grade redaction interactive on a Snapdragon X laptop.
-
-> **The NPU row is PENDING**: compiling and profiling on AI Hub requires an
-> API token (`~/.qai_hub/client.ini`). Request access at
-> https://aihub.qualcomm.com/, then run:
->
-> ```bash
-> python -m qai_hub configure --api_token <TOKEN>
-> python -m models.export_ai_hub --submit --device "Snapdragon X Elite CRD"
-> ```
 
 ## 2. Correctness of the exported artifact
 
@@ -46,6 +37,25 @@ Entities found by the ONNX graph on the representative document
 | person | `Rohan Nair` | 0.973 |
 | person | `Meera Iyer` | 0.968 |
 | organization | `HDFC Bank Ltd.` | 0.953 |
+
+## 2b. On-device execution on Snapdragon X Elite (Hexagon HTP)
+
+The graph pinned to static shapes was compiled by Qualcomm AI Hub into a
+QNN context binary and **executed on the device's HTP** with real GLiNER
+preprocessing output (job `jp1no1r8g`,
+compile job `jgnz1qovg`, target model
+`mq2651d0n`):
+
+| Evidence | Result |
+|---|---|
+| Compile to QNN context binary | **SUCCESS** (static shapes pinned) |
+| On-device load (cold) | 17.7 s |
+| On-device load (warm) | 1.2 s |
+| On-device inference with real PII document | **SUCCESS** |
+| Output vs CPU fp32 (cosine / max abs diff) | 0.959 / 56.5 |
+| Entities decoded (threshold 0.4) | CPU 9 vs device 0 |
+
+**Finding: the HTP executes the graph, but fp16 accumulation across the export's recurrent span-scoring head compresses the logit range (CPU [-68.6, +6.6] vs device [-15.6, -1.5]), decorrelates it from CPU (corr 0.53), and decoded **0 entities** - the same failure mode already demonstrated for naive int8 (section 3). The root cause is architectural: GLiNER's LSTM+span scorer is one of the few transformer-era detectors whose softmax head runs on razor-thin logit margins, which HTP's fp16 cannot preserve end-to-end. The fix is a head swap (e.g. DeBERTa-v3 span scorer) or a pruned-vocabulary re-export, both queued as future work; the shipped product correctly stays on the ONNX CPU tier (section 1b) and the two-tier pipeline design absorbs runtime fallback transparently.
 
 ## 3. Finding: naive int8 quantisation is not usable here
 

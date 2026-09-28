@@ -11,7 +11,7 @@ encrypted vault only your passphrase can open.
 
 Built for the **Snapdragon® AI Lab Build & Present Challenge** — designed to run
 entirely on-device, with the AI model compiled **and executed** on the **Hexagon NPU** of
-Snapdragon X-powered HP PCs via **Qualcomm AI Hub** — measured findings in `benchmarks/npu.md`.
+a Snapdragon X Elite via **Qualcomm AI Hub** — the same silicon inside HP OmniBook AI PCs, the challenge's target device class — measured findings in `benchmarks/npu.md`.
 
 ## Why on-device
 
@@ -19,6 +19,12 @@ Documents full of PII are exactly the files people should never upload.
 Redacta's entire pipeline is local: detection, redaction, vault storage and
 decryption. The proof is in the demo — run a packet capture while using it and
 watch zero bytes leave the machine.
+
+Since India's **DPDP Act 2023**, uploading an Aadhaar or PAN scan to a cloud PII
+API to redact it is itself a compliance event — the sensitive data reaches a
+third party before redaction even starts. Redacta inverts that order: the
+document never leaves the machine, so the redaction step cannot leak what it
+protects.
 
 ## Features
 
@@ -103,6 +109,15 @@ Measured on CPU (see [`benchmarks/npu.md`](benchmarks/npu.md)): regex tier
 moving the graph onto the HTP. Two findings are recorded there rather than
 hidden: naive int8 quantisation collapses the model (8.9% argmax agreement,
 0 of 9 entities found); Hexagon fp16 execution fails the same way (`npu.md` §2b);
+
+## How it compares
+
+| Approach | Data privacy | Latency / doc | Indian ID validation | Reversible redaction |
+|---|---|---|---|---|
+| Cloud PII APIs (DLP / Comprehend…) | ❌ raw PII leaves the device | ~500 ms + upload | ❌ generic entities | ❌ |
+| Generic on-device NER | ✅ local | ~300 ms | ❌ no checksums — a 12-digit order ID gets flagged as Aadhaar | ❌ |
+| Regex suites only | ✅ local | ~0.3 ms | ⚠️ pattern-only | ❌ |
+| **Redacta AI** | ✅ zero cloud (verify with a packet capture during the demo) | **0.27 ms regex · ~285 ms AI** | ✅ Verhoeff / PAN / IFSC / Luhn | ✅ encrypted local vault + audit trail |
 
 ## Status
 

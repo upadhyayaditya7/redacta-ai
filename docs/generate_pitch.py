@@ -250,12 +250,12 @@ def slide_accuracy(prs):
 
 def slide_snapdragon(prs):
     s = base_slide(prs)
-    title_bar(s, "Snapdragon & Qualcomm AI Hub", "Compiled and executed on the real X Elite NPU")
+    title_bar(s, "Snapdragon & Qualcomm AI Hub", "Executed on the X Elite HTP — the silicon inside HP OmniBook AI PCs")
     bullets(s, [
-        ("Pipeline: ", "GLiNER-PII → ONNX (static shapes) → QNN context binary → Snapdragon X Elite CRD (Hexagon v73) via AI Hub."),
+        ("Pipeline: ", "GLiNER-PII → ONNX (static shapes) → QNN context binary → Hexagon NPU (Snapdragon X Elite CRD) via AI Hub — the same silicon inside HP OmniBook AI PCs, the challenge's target device class."),
         ("Real jobs, real device: ", "compile jgnz1qovg SUCCESS · on-device inference jp1no1r8g SUCCESS with genuine tokenized input."),
         ("Two upstream fixes contributed: ", "int64 ReduceMax lowered to fp32 casts; span-Einsum rewritten as Transpose+MatMul — proven bitwise-identical (9/9 entities, max diff 0.0)."),
-        ("On-device load: ", "17.7 s cold → 1.2 s warm; every load/inference step logged by the device runtime."),
+        ("On-device load: ", "17.7 s cold → 1.2 s warm on target model mq2651d0n; every step logged by the device runtime."),
     ])
     footer(s, 6, TOTAL)
 

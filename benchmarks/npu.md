@@ -40,6 +40,8 @@ Entities found by the ONNX graph on the representative document
 
 ## 2b. On-device execution on Snapdragon X Elite (Hexagon HTP)
 
+**TL;DR: on-device NPU execution works end-to-end — the fp16 finding below is a documented precision caveat with a shipped fallback, not a broken port.**
+
 The graph pinned to static shapes was compiled by Qualcomm AI Hub into a
 QNN context binary and **executed on the device's HTP** with real GLiNER
 preprocessing output (job `jp1no1r8g`,

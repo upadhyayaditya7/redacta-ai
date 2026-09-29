@@ -347,6 +347,13 @@ def build():
         "That gap is exactly what NPUs are for: private inference that never leaves "
         "the machine."
     ))
+    story.extend(body(
+        "The <b>DPDP Act 2023</b> sharpens the stakes: uploading an Aadhaar or PAN "
+        "scan to a cloud PII API to redact it is itself a compliance event — the "
+        "sensitive data reaches a third party before redaction even starts. "
+        "Redacta inverts that order: the document never leaves the machine, so the "
+        "redaction step cannot leak what it protects."
+    ))
 
     # --- 2. Solution ---
     story.extend(section("2", "Solution"))

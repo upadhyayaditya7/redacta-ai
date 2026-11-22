@@ -67,3 +67,60 @@ def test_vault_action_defaults():
 
     assert spec(EntityType.AADHAAR).action is Action.VAULT
     assert spec(EntityType.PASSWORD).action is Action.IRREVERSIBLE
+
+
+# --- regression: a bad passphrase must never destroy the vault ------------
+
+
+def test_wrong_passphrase_never_recreates_the_vault(tmp_path):
+    """The UI used to fall back to create() on any unlock error. A typo then
+    replaced the real vault, orphaning every token it had issued."""
+    path = tmp_path / "vault.json"
+    vault = Vault(path)
+    vault.create("real-pass")
+    token = vault.store("2345 6789 1234")
+
+    with pytest.raises(VaultError):
+        Vault(path).load("typo-pass")
+
+    reopened = Vault(path)
+    reopened.load("real-pass")
+    assert reopened.reveal(token) == "2345 6789 1234"
+
+
+def test_failed_load_leaves_a_fresh_instance_locked(tmp_path):
+    """A bad passphrase must not leave the object half-initialised with a wrong
+    key, which would silently write unreadable entries on the next store()."""
+    path = tmp_path / "vault.json"
+    Vault(path).create("real-pass")
+
+    fresh = Vault(path)
+    with pytest.raises(VaultError):
+        fresh.load("typo-pass")
+    assert not fresh.unlocked
+    with pytest.raises(VaultError):
+        fresh.store("anything")
+
+
+def test_create_backs_up_the_previous_vault(tmp_path):
+    path = tmp_path / "vault.json"
+    vault = Vault(path)
+    vault.create("first")
+    token = vault.store("kept-value")
+
+    vault.create("second")  # deliberate overwrite
+
+    backup = tmp_path / "vault.json.bak"
+    assert backup.exists()
+    old = Vault(backup)
+    old.load("first")
+    assert old.reveal(token) == "kept-value"
+
+
+def test_store_dedupes_identical_values(vault):
+    """One value must map to one placeholder, not one per occurrence."""
+    first = vault.store("same-value")
+    second = vault.store("same-value")
+    assert first == second
+    assert vault.tokens() == [first]
+

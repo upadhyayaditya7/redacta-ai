@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -37,14 +38,32 @@ def _parse_types(names: str | None) -> list[EntityType] | None:
     return [EntityType(n.strip().upper()) for n in names.split(",")]
 
 
+def _passphrase(args, required: bool = False) -> str | None:
+    """Passphrase from --vault-pass, REDACTA_VAULT_PASS, or a hidden prompt.
+
+    ``--vault-pass`` is convenient but lands in shell history and in the process
+    list, so the environment variable is the better default for scripts and the
+    prompt is used when a human runs an interactive command.
+    """
+    value = getattr(args, "vault_pass", None) or os.environ.get("REDACTA_VAULT_PASS")
+    if value:
+        return value
+    if not required:
+        return None
+    import getpass
+
+    return getpass.getpass("Vault passphrase: ")
+
+
 def _vault_from_args(args) -> Vault | None:
-    """Build an (optionally unlocked) vault from --vault-pass; None if absent."""
-    if not args.vault_pass:
+    """Build an (optionally unlocked) vault; None when no passphrase is given."""
+    passphrase = _passphrase(args)
+    if not passphrase:
         return None
     vault = Vault()
     if not vault.exists() or getattr(args, "yes", False):
-        vault.create(args.vault_pass)
-    vault.load(args.vault_pass)
+        vault.create(passphrase)
+    vault.load(passphrase)
     return vault
 
 
@@ -115,7 +134,7 @@ def cmd_redact(args) -> int:
 
 def cmd_reveal(args) -> int:
     vault = Vault()
-    vault.load(args.vault_pass)
+    vault.load(_passphrase(args, required=True) or "")
     print(vault.reveal(args.token))
     return 0
 
@@ -208,7 +227,8 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("redact", parents=[common], help="redact a text/PDF file")
     p.add_argument("file")
     p.add_argument("--out", help="output path")
-    p.add_argument("--vault-pass", help="passphrase to enable the reversible vault")
+    p.add_argument("--vault-pass",
+                   help="passphrase to enable the reversible vault (else $REDACTA_VAULT_PASS)")
     p.add_argument("--show-tokens", action="store_true")
     p.add_argument("--yes", action="store_true", help="overwrite an existing vault")
     p.add_argument("--audit-report", default=None, metavar="PATH",
@@ -217,12 +237,13 @@ def main(argv: list[str] | None = None) -> int:
 
     p = sub.add_parser("reveal", help="reveal a «RDCT-…» token (needs vault passphrase)")
     p.add_argument("token")
-    p.add_argument("--vault-pass", required=True)
+    p.add_argument("--vault-pass", help="passphrase (else $REDACTA_VAULT_PASS, else a prompt)")
     p.set_defaults(func=cmd_reveal)
 
     p = sub.add_parser("batch", parents=[common], help="redact every document in a folder")
     p.add_argument("folder")
-    p.add_argument("--vault-pass", help="passphrase to enable the reversible vault")
+    p.add_argument("--vault-pass",
+                   help="passphrase to enable the reversible vault (else $REDACTA_VAULT_PASS)")
     p.add_argument("--watch", action="store_true", help="keep watching for new files")
     p.add_argument("--audit-report", default=None, metavar="PATH",
                    help="write a JSON audit report (default: audit.json in the output folder; 'none' disables)")

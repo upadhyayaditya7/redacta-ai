@@ -102,11 +102,13 @@ def cmd_redact(args) -> int:
 
         result, out = redact_pdf(src, pipeline, vault, _parse_types(args.types))
         out = Path(args.out) if args.out else Path(out)
+        report = result.report
     elif ext in {".png", ".jpg", ".jpeg", ".bmp", ".webp"}:
         from core.redact import redact_image
 
         result, out = redact_image(src, pipeline, vault, _parse_types(args.types))
         out = Path(args.out) if args.out else Path(out)
+        report = result.report
     else:
         text = src.read_text(encoding="utf-8")
         report = pipeline.analyze(text, _parse_types(args.types))

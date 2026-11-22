@@ -176,6 +176,8 @@ if "vault" not in st.session_state:
     st.session_state.vault = Vault()
 if "ner_ready" not in st.session_state:
     st.session_state.ner_ready = importlib.util.find_spec("gliner") is not None
+if "vault_unlocked" not in st.session_state:
+    st.session_state.vault_unlocked = False
 
 vault_obj: Vault = st.session_state.vault
 pipeline: RedactionPipeline = st.session_state.pipeline
@@ -238,16 +240,29 @@ with st.sidebar:
         placeholder="Passphrase…",
         help="Decrypts redactions locally — never leaves this machine.",
     )
-    if st.button("🔐  Create / unlock vault", use_container_width=True):
-        if not vault_pass:
-            st.warning("Enter a passphrase first.")
-        else:
-            try:
-                vault_obj.load(vault_pass)
-                st.success("Vault unlocked.")
-            except Exception:
+    # Unlock and create are deliberately separate actions: a mistyped passphrase
+    # must never be read as "there is no vault here" and overwrite the real one,
+    # which would make every «RDCT-…» token ever issued unrecoverable.
+    if vault_obj.exists():
+        if st.button("🔓  Unlock vault", use_container_width=True):
+            if not vault_pass:
+                st.warning("Enter a passphrase first.")
+            else:
+                try:
+                    vault_obj.load(vault_pass)
+                    st.session_state.vault_unlocked = True
+                    st.success("Vault unlocked.")
+                except Exception as exc:  # noqa: BLE001 - show the real reason
+                    st.session_state.vault_unlocked = False
+                    st.error(f"Could not unlock this vault: {exc}")
+    else:
+        if st.button("🆕  Create vault", use_container_width=True):
+            if not vault_pass:
+                st.warning("Enter a passphrase first.")
+            else:
                 vault_obj.create(vault_pass)
-                st.success("New vault created.")
+                st.session_state.vault_unlocked = True
+                st.success("Vault created — keep this passphrase safe.")
 
     st.markdown('<div class="side-label">Try it</div>', unsafe_allow_html=True)
     b_col1, b_col2 = st.columns(2)
@@ -264,6 +279,10 @@ with st.sidebar:
     st.divider()
     st.caption("CLI: `python app.py scan …` · [github.com/upadhyayaditya7/redacta-ai]"
                "(https://github.com/upadhyayaditya7/redacta-ai)")
+
+# A passphrase typed but not unlocked (wrong passphrase, corrupt vault) must not
+# be used for storage: redact irreversibly instead of raising mid-run.
+vault_active = vault_obj if st.session_state.get("vault_unlocked") else None
 
 # -------------------------------------------------------------- main ---
 input_text = st.text_area(
@@ -300,15 +319,15 @@ if upload is not None:
         with st.spinner("Redacting on-device…"):
             try:
                 if suffix == ".pdf":
-                    result, out_path = redact_pdf(local_path, pipeline, vault_obj if vault_pass else None,
+                    result, out_path = redact_pdf(local_path, pipeline, vault_active,
                                                   _types_from_selection(selected))
                 elif suffix in {".png", ".jpg", ".jpeg", ".bmp", ".webp"}:
-                    result, out_path = redact_image(local_path, pipeline, vault_obj if vault_pass else None,
+                    result, out_path = redact_image(local_path, pipeline, vault_active,
                                                     _types_from_selection(selected))
                 else:
                     text = local_path.read_text(encoding="utf-8", errors="replace")
                     report = pipeline.analyze(text, _types_from_selection(selected))
-                    result = redact_text(text, report, vault_obj if vault_pass else None,
+                    result = redact_text(text, report, vault_active,
                                          _types_from_selection(selected))
                     out_path = tmp / (local_path.stem + ".redacted.txt")
                     out_path.write_text(result.redacted_text, encoding="utf-8")
@@ -318,7 +337,7 @@ if upload is not None:
                     source=upload.name,
                     report=result.report,
                     result=result,
-                    vault_hints={t: vault_obj.entry_hint(t) for t in result.token_map} if vault_pass else None,
+                    vault_hints={t: vault_obj.entry_hint(t) for t in result.token_map} if vault_active else None,
                 )
                 st.session_state["file_audit"] = rec.to_json()
             except Exception as exc:  # noqa: BLE001 — surface OCR/parse errors in the UI
@@ -386,7 +405,7 @@ if run_scan or run_redact:
 
     with tab2:
         if run_redact:
-            result = redact_text(input_text, report, vault_obj if vault_pass else None, types)
+            result = redact_text(input_text, report, vault_active, types)
             st.session_state["last_result"] = result
         if "last_result" in st.session_state:
             result = st.session_state["last_result"]
@@ -400,7 +419,7 @@ if run_scan or run_redact:
             st.write("")
             st.markdown('<div class="sec-title">Sanitised document</div>', unsafe_allow_html=True)
             st.code(result.redacted_text or "—", language="text")
-            if result.token_map and vault_pass:
+            if result.token_map and vault_active:
                 rows = "".join(
                     f'<div class="token-row"><span class="tok">{tok}</span>'
                     f'<span class="arr">→</span><span class="hint">{vault_obj.entry_hint(tok)}</span></div>'

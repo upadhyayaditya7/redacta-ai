@@ -67,7 +67,8 @@ _IN_MOBILE = r"(?<!\d)(\+?91[ -]?)?([6-9]\d{4}[ -]?\d{5})(?!\d)"
 _EMAIL = r"(?<![A-Za-z0-9._%+-])([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})(?![A-Za-z0-9._%+-])"
 _CC = r"(?<!\d)((?:\d{4}[ -]?){3}\d{1,4})(?!\d)"
 _SECRET = (
-    r"(?i)\b((?:api[_-]?key|secret[_-]?key|access[_-]?token|auth[_-]?token|private[_-]?key)\b\s*[:=]\s*\S+)"
+    r"(?i)\b(?:api[_-]?key|secret[_-]?key|access[_-]?token|auth[_-]?token|private[_-]?key)"
+    r"\b\s*[:=]\s*(\S+)"
 )
 _SK_KEY = r"\b(sk|pk)_(?:test|live)_[0-9a-zA-Z]{16,}\b"
 _OTP = r"(?i)\b(?:otp|one[- ]time (?:password|code))\b\s*(?:is|:|-)?\s*([0-9]{4,8})\b"
@@ -118,19 +119,25 @@ def _validate(entity_type: EntityType, text: str, groups: tuple[str, ...]) -> tu
     return 0.8, "regex pattern match"
 
 
-_RULES: tuple[tuple[EntityType, str, re.Pattern[str]], ...] = (
-    (EntityType.AADHAAR, "Aadhaar", re.compile(_AADHAAR)),
-    (EntityType.PAN, "PAN", re.compile(_PAN)),
-    (EntityType.IFSC, "IFSC", re.compile(_IFSC)),
-    (EntityType.UPI_ID, "UPI", re.compile(_UPI)),
-    (EntityType.EMAIL, "Email", re.compile(_EMAIL)),
-    (EntityType.SECRET_KEY, "Secret", re.compile(_SECRET)),
-    (EntityType.OTP, "OTP", re.compile(_OTP)),
-    (EntityType.PASSWORD, "Password", re.compile(_PW)),
-    (EntityType.DATE_OF_BIRTH, "DOB", re.compile(_DOB_PREFIX + _DMY)),
-    (EntityType.CREDIT_CARD, "Card", re.compile(_CC)),
-    (EntityType.INDIAN_MOBILE, "IN-mobile", re.compile(_IN_MOBILE)),
-    (EntityType.BANK_ACCOUNT, "BankAcct", re.compile(_BANK_ACCT)),
+#: ``(type, label, pattern, first_group, last_group)``.  The group range says
+#: which capture groups hold the *value*: several patterns match a field label
+#: (``DOB :``, ``password:``) so that the value can be validated in context, and
+#: the span must cover the value alone — otherwise redaction eats the document's
+#: own labels and downstream offsets stop lining up with the real value.
+#: ``(0, 0)`` means "the whole match".
+_RULES: tuple[tuple[EntityType, str, re.Pattern[str], int, int], ...] = (
+    (EntityType.AADHAAR, "Aadhaar", re.compile(_AADHAAR), 1, 1),
+    (EntityType.PAN, "PAN", re.compile(_PAN), 1, 1),
+    (EntityType.IFSC, "IFSC", re.compile(_IFSC), 1, 1),
+    (EntityType.UPI_ID, "UPI", re.compile(_UPI), 1, 1),
+    (EntityType.EMAIL, "Email", re.compile(_EMAIL), 1, 1),
+    (EntityType.SECRET_KEY, "Secret", re.compile(_SECRET), 1, 1),
+    (EntityType.OTP, "OTP", re.compile(_OTP), 1, 1),
+    (EntityType.PASSWORD, "Password", re.compile(_PW), 3, 3),
+    (EntityType.DATE_OF_BIRTH, "DOB", re.compile(_DOB_PREFIX + _DMY), 1, 3),
+    (EntityType.CREDIT_CARD, "Card", re.compile(_CC), 1, 1),
+    (EntityType.INDIAN_MOBILE, "IN-mobile", re.compile(_IN_MOBILE), 0, 0),
+    (EntityType.BANK_ACCOUNT, "BankAcct", re.compile(_BANK_ACCT), 1, 1),
 )
 
 
@@ -142,13 +149,18 @@ class RegexDetector:
     def detect(self, text: str, types: list[EntityType] | None = None) -> DetectionResult:
         wanted = set(types) if types else None
         spans: list[Span] = []
-        for entity_type, label, rx in _RULES:
+        for entity_type, label, rx, first_group, last_group in _RULES:
             if wanted is not None and entity_type not in wanted:
                 continue
             for m in rx.finditer(text):
                 groups = m.groups() if rx.groups else ()
-                full = m.group(0)
-                checked = groups[0] if groups else full
+                if first_group:
+                    start, end = m.start(first_group), m.end(last_group)
+                    if start < 0 or end < 0:  # optional group did not match
+                        continue
+                else:
+                    start, end = m.start(), m.end()
+                checked = groups[0] if groups else m.group(0)
                 verdict = _validate(entity_type, checked, groups)
                 if verdict is None:
                     continue
@@ -156,9 +168,9 @@ class RegexDetector:
                 spans.append(
                     Span(
                         entity_type=entity_type,
-                        start=m.start(),
-                        end=m.end(),
-                        text=full,
+                        start=start,
+                        end=end,
+                        text=text[start:end],
                         score=score,
                         detector=f"regex:{label}",
                         reason=reason,
@@ -167,9 +179,23 @@ class RegexDetector:
         return DetectionResult(_resolve_overlaps(spans))
 
 
+def _verified(span: Span) -> int:
+    """1 when a checksum/format validator signed off on this hit, else 0.
+
+    A verified regex hit (Verhoeff, Luhn, PAN structure) is a fact; a NER hit is
+    a probability.  Ranking by score alone let a 0.997 "phone number" guess
+    displace the exact regex match and, worse, let a broad NER person span
+    swallow a card or Aadhaar number inside it.  Verified hits therefore always
+    win an overlap, and only the remaining spans are ranked by score.
+    """
+    return 1 if span.detector.startswith("regex") and span.score >= 0.99 else 0
+
+
 def _resolve_overlaps(spans: list[Span]) -> list[Span]:
-    """Keep the highest-scoring span when detections overlap."""
-    ordered = sorted(spans, key=lambda s: (-s.score, -(s.end - s.start), s.start))
+    """Keep the best span when detections overlap (verified first, then score)."""
+    ordered = sorted(
+        spans, key=lambda s: (-_verified(s), -s.score, -(s.end - s.start), s.start)
+    )
     kept: list[Span] = []
     for s in ordered:
         if not any(s.overlaps(k) for k in kept):

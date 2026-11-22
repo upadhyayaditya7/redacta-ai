@@ -4,6 +4,7 @@ import random
 
 from core.entities import EntityType
 from core.pipeline import RedactionPipeline
+from core.redact import redact_text
 from core.regex_rules import RegexDetector, _resolve_overlaps
 from utils.samples import aadhaar, card, document, ifsc, pan
 
@@ -64,3 +65,49 @@ def test_types_filter():
     text = "email a@b.com PAN ABCDE1234F"
     spans = RegexDetector().detect(text, [EntityType.PAN]).spans
     assert all(s.entity_type is EntityType.PAN for s in spans)
+
+
+def test_value_span_excludes_the_field_label():
+    """A span must cover the value, not the "DOB :" prefix in front of it.
+
+    Regression: the span used to start at the label, so redaction ate the
+    document's own labels and the span stopped matching the value's offsets.
+    """
+    text = "DOB            : 14/03/1996"
+    spans = RegexDetector().detect(text).spans
+    dob = [s for s in spans if s.entity_type is EntityType.DATE_OF_BIRTH]
+    assert dob, "DOB not detected"
+    assert dob[0].text == "14/03/1996"
+    assert text[dob[0].start:dob[0].end] == "14/03/1996"
+
+
+def test_password_span_is_the_password_only():
+    spans = RegexDetector().detect("Note: password: Hunter2026!").spans
+    pw = [s for s in spans if s.entity_type is EntityType.PASSWORD]
+    assert pw and pw[0].text == "Hunter2026!"
+
+
+def test_secret_span_is_the_key_only():
+    spans = RegexDetector().detect("api_key = sk_test_51Kx9qqAbCdEfGh123456").spans
+    secret = [s for s in spans if s.entity_type is EntityType.SECRET_KEY]
+    assert secret and secret[0].text == "sk_test_51Kx9qqAbCdEfGh123456"
+
+
+def test_redaction_keeps_document_labels():
+    """Only the value is replaced; the field label stays readable."""
+    text = "DOB            : 14/03/1996\n"
+    report = RedactionPipeline(use_ner=False).analyze(text)
+    result = redact_text(text, report, None)
+    assert "DOB" in result.redacted_text
+    assert "14/03/1996" not in result.redacted_text
+
+
+def test_verified_regex_outranks_a_confident_ner_span():
+    """A checksum-verified hit is a fact; a NER guess must not displace it."""
+    from core.regex_rules import Span
+
+    ner = Span(EntityType.PERSON, 0, 16, "4111111111111111", 0.99, "ner-gliner:person")
+    rx = Span(EntityType.CREDIT_CARD, 0, 16, "4111111111111111", 1.0, "regex:Card")
+    kept = _resolve_overlaps([ner, rx])
+    assert len(kept) == 1
+    assert kept[0].entity_type is EntityType.CREDIT_CARD

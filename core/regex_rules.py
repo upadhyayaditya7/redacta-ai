@@ -70,9 +70,39 @@ _SECRET = (
     r"(?i)\b(?:api[_-]?key|secret[_-]?key|access[_-]?token|auth[_-]?token|private[_-]?key)"
     r"\b\s*[:=]\s*(\S+)"
 )
+#: Credential values that carry a recognisable issuer prefix.  These are
+#: matched on their own, with no ``label:`` in front, because statements and
+#: config dumps routinely put the value in a neighbouring cell or line.
+_KEY_PREFIX = (
+    r"(?<![A-Za-z0-9_-])("
+    r"(?:sk|pk)_(?:test|live)_[0-9a-zA-Z]{16,}"
+    r"|whsec_[0-9A-Za-z]{16,}"
+    r"|rk_live_[0-9A-Za-z]{16,}"
+    r"|AKIA[0-9A-Z]{16}"
+    r"|gh[pousr]_[0-9A-Za-z]{20,}"
+    r"|xox[abprs]-[0-9A-Za-z-]{10,}"
+    r"|AIza[0-9A-Za-z_-]{30,}"
+    r")(?![A-Za-z0-9_-])"
+)
 _SK_KEY = r"\b(sk|pk)_(?:test|live)_[0-9a-zA-Z]{16,}\b"
 _OTP = r"(?i)\b(?:otp|one[- ]time (?:password|code))\b\s*(?:is|:|-)?\s*([0-9]{4,8})\b"
 _PW = r"(?i)\b(pass(word)?|pwd)\b\s*[:=]\s*(\S{4,64})"
+#: Same field, but the label and the value are only separated by whitespace —
+#: a table cell or a PDF text run where the colon is invisible to extraction
+#: (``Password`` / ``Meridian@2026`` on consecutive lines).  The value must
+#: still look like a credential (digits plus a symbol), so prose such as
+#: "the password policy requires rotation" is left alone.
+_PW_SPACED = (
+    r"(?i)\b(?:pass(?:word)?|pwd)\b\s+"
+    r"((?=[^\s]*\d)(?=[^\s]*[^A-Za-z0-9])[^\s]{4,64})(?=\s|$)"
+)
+#: Credential field with a whitespace-only separator, where the value has no
+#: issuer prefix (a bare 32-character token and similar).
+_SECRET_SPACED = (
+    r"(?i)\b(?:api[_-]?key|secret[_-]?key|access[_-]?token|auth[_-]?token"
+    r"|private[_-]?key|signing secret|webhook secret)\b\s+"
+    r"((?=[^\s]*\d)(?=[^\s]*[A-Za-z])[A-Za-z0-9_-]{16,})(?=\s|$)"
+)
 _DOB_PREFIX = r"(?i)(?:d\.?o\.?b\.?|dob|date of birth|birth date)\s*[:=-]?\s*"
 _DMY = r"(\d{1,2})[ \-/.]([A-Za-z]{3,9}|\d{1,2})[ \-/.](\d{4})"
 
@@ -109,13 +139,13 @@ def _validate(entity_type: EntityType, text: str, groups: tuple[str, ...]) -> tu
     if entity_type is EntityType.BANK_ACCOUNT:
         return 0.6, "11-18 digit number (checksum unavailable)"
     if entity_type is EntityType.SECRET_KEY:
-        if groups[0] and re.match(_SK_KEY, groups[0]):
-            return 1.0, "Known secret-key prefix (sk_/pk_)"
+        if groups[0] and re.fullmatch(_KEY_PREFIX, groups[0]):
+            return 1.0, "Known secret-key prefix (sk_/whsec_/AKIA/…)"
         return 0.95, "Credential key=value pattern"
     if entity_type is EntityType.OTP:
         return 0.95, "'OTP is <code>' pattern"
     if entity_type is EntityType.PASSWORD:
-        return 0.9, "password= field"
+        return 0.9, "password field (label next to value)"
     return 0.8, "regex pattern match"
 
 
@@ -132,8 +162,11 @@ _RULES: tuple[tuple[EntityType, str, re.Pattern[str], int, int], ...] = (
     (EntityType.UPI_ID, "UPI", re.compile(_UPI), 1, 1),
     (EntityType.EMAIL, "Email", re.compile(_EMAIL), 1, 1),
     (EntityType.SECRET_KEY, "Secret", re.compile(_SECRET), 1, 1),
+    (EntityType.SECRET_KEY, "Key-prefix", re.compile(_KEY_PREFIX), 1, 1),
+    (EntityType.SECRET_KEY, "Secret", re.compile(_SECRET_SPACED), 1, 1),
     (EntityType.OTP, "OTP", re.compile(_OTP), 1, 1),
     (EntityType.PASSWORD, "Password", re.compile(_PW), 3, 3),
+    (EntityType.PASSWORD, "Password", re.compile(_PW_SPACED), 1, 1),
     (EntityType.DATE_OF_BIRTH, "DOB", re.compile(_DOB_PREFIX + _DMY), 1, 3),
     (EntityType.CREDIT_CARD, "Card", re.compile(_CC), 1, 1),
     (EntityType.INDIAN_MOBILE, "IN-mobile", re.compile(_IN_MOBILE), 0, 0),

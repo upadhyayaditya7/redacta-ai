@@ -93,6 +93,49 @@ def test_secret_span_is_the_key_only():
     assert secret and secret[0].text == "sk_test_51Kx9qqAbCdEfGh123456"
 
 
+def test_password_detected_when_label_and_value_are_in_separate_cells():
+    """Table layout: label on one line, password on the next, no colon.
+
+    Regression: a real statement leaked ``Meridian@2026`` because the rule
+    demanded ``password:`` on one line.
+    """
+    text = "Net banking user ID aarav.sharma1987\nPassword\nMeridian@2026\n"
+    spans = RegexDetector().detect(text).spans
+    pw = [s for s in spans if s.entity_type is EntityType.PASSWORD]
+    assert pw and pw[0].text == "Meridian@2026"
+
+
+def test_password_detected_when_label_and_value_share_a_line_without_colon():
+    text = "Net banking user ID aarav.sharma1987 Password Meridian@2026"
+    spans = RegexDetector().detect(text).spans
+    pw = [s for s in spans if s.entity_type is EntityType.PASSWORD]
+    assert pw and pw[0].text == "Meridian@2026"
+
+
+def test_prefixed_api_keys_are_detected_without_any_label():
+    # The fixtures are assembled at runtime so the file holds no key-shaped
+    # literal: GitHub push protection rejects commits containing one.
+    for key in (
+        "sk_" + "live_51MrdKx9qqAbCdEfGh123456",
+        "whsec" + "_92bXq1LmN7pR4tYu8VwZ",
+        "AKIA" + "IOSFODNN7EXAMPLE",
+        "ghp" + "_16C7e42F292c6912E7710c838347Ae178B4a",
+    ):
+        spans = RegexDetector().detect(f"Webhook signing secret {key}").spans
+        secret = [s for s in spans if s.entity_type is EntityType.SECRET_KEY]
+        assert secret, f"not detected: {key}"
+        assert secret[0].text == key
+
+
+def test_prose_about_a_password_field_is_not_flagged():
+    for text in (
+        "The password policy requires rotation every 90 days.",
+        "Reset your password at least once a year.",
+    ):
+        spans = RegexDetector().detect(text).spans
+        assert not [s for s in spans if s.entity_type is EntityType.PASSWORD]
+
+
 def test_redaction_keeps_document_labels():
     """Only the value is replaced; the field label stays readable."""
     text = "DOB            : 14/03/1996\n"

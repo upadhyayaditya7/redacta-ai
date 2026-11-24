@@ -31,3 +31,10 @@ data/samples/*
 
 # Tooling metadata
 .freebuff/
+
+# Personal documents and scratch files (contain personal identifiers)
+/*.docx
+~$*
+readme_check.txt
+generate_docx_*.py
+benchmarks/ai_hub_profile.json

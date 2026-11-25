@@ -136,6 +136,43 @@ def test_prose_about_a_password_field_is_not_flagged():
         assert not [s for s in spans if s.entity_type is EntityType.PASSWORD]
 
 
+def test_customer_id_is_detected_from_its_label():
+    for text in ("Customer ID MNRB00184732", "Customer ID\nMNRB00184732"):
+        spans = RegexDetector().detect(text).spans
+        cid = [s for s in spans if s.entity_type is EntityType.CUSTOMER_ID]
+        assert cid, f"not detected in {text!r}"
+        assert cid[0].text == "MNRB00184732"
+
+
+def test_net_banking_user_id_is_detected_across_a_line_break():
+    text = "Net banking user ID\naarav.sharma1987\nPassword\nMeridian@2026\n"
+    spans = RegexDetector().detect(text).spans
+    uid = [s for s in spans if s.entity_type is EntityType.USER_ID]
+    assert uid and uid[0].text == "aarav.sharma1987"
+    assert not [s for s in spans if s.text == "Password"]
+
+
+def test_card_tail_in_a_narration_line_is_detected():
+    text = "22/10/2026 AMAZON PAY INDIA PVT LTD CARD 0626 7858 POS9974100995 425.00"
+    spans = RegexDetector().detect(text).spans
+    card = [s for s in spans if s.entity_type is EntityType.CREDIT_CARD]
+    assert card and card[0].text == "0626 7858"
+    assert card[0].reason == "card fragment after a CARD label"
+
+
+def test_prose_about_accounts_and_cards_is_not_flagged():
+    for text in (
+        "Reset your net banking user ID regularly.",
+        "Please contact customer care if your card is lost.",
+    ):
+        spans = RegexDetector().detect(text).spans
+        assert not [
+            s
+            for s in spans
+            if s.entity_type in {EntityType.USER_ID, EntityType.CUSTOMER_ID, EntityType.CREDIT_CARD}
+        ], f"false positive in {text!r}"
+
+
 def test_redaction_keeps_document_labels():
     """Only the value is replaced; the field label stays readable."""
     text = "DOB            : 14/03/1996\n"

@@ -37,6 +37,8 @@ class EntityType(str, Enum):
     UPI_ID = "UPI_ID"
     BANK_ACCOUNT = "BANK_ACCOUNT"
     INDIAN_MOBILE = "INDIAN_MOBILE"
+    CUSTOMER_ID = "CUSTOMER_ID"
+    USER_ID = "USER_ID"
 
     # --- Universal PII --------------------------------------------------
     EMAIL = "EMAIL"
@@ -60,6 +62,8 @@ ENTITY_SPECS: dict[EntityType, EntitySpec] = {
     EntityType.UPI_ID: EntitySpec("UPI ID", "📲", Action.VAULT, "critical"),
     EntityType.BANK_ACCOUNT: EntitySpec("Bank account number", "🏛️", Action.VAULT, "critical"),
     EntityType.INDIAN_MOBILE: EntitySpec("Indian mobile number", "📱", Action.VAULT, "normal"),
+    EntityType.CUSTOMER_ID: EntitySpec("Customer ID", "🪪", Action.VAULT, "normal"),
+    EntityType.USER_ID: EntitySpec("Net-banking user ID", "🧑‍💻", Action.VAULT, "critical"),
     EntityType.EMAIL: EntitySpec("Email address", "📧", Action.IRREVERSIBLE, "normal"),
     EntityType.PHONE: EntitySpec("Phone number", "☎️", Action.VAULT, "normal"),
     EntityType.DATE_OF_BIRTH: EntitySpec("Date of birth", "🎂", Action.VAULT, "normal"),

@@ -66,7 +66,7 @@ python app.py models                          # model stack + AI Hub targets
 streamlit run frontend/app.py                 # the UI
 ```
 
-Tests: `python -m pytest tests -q` (48 passing).
+Tests: `python -m pytest tests -q` (52 passing).
 
 ## Architecture
 
@@ -122,7 +122,7 @@ hidden: naive int8 quantisation collapses the model (8.9% argmax agreement,
 ## Status
 
 Working pipeline (detect → explain → redact → vault → reveal → batch → audit),
-48 tests passing. AI tier exported to ONNX, verified, benchmarked, compiled to
+52 tests passing. AI tier exported to ONNX, verified, benchmarked, compiled to
 a QNN context binary, and executed on the X Elite HTP (findings: `npu.md`).
 Roadmap: NPU-viable detector head, embedding vocabulary pruning, OCR polish.
 

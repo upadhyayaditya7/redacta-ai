@@ -66,6 +66,24 @@ _BANK_ACCT = r"(?<!\d)(\d{11,18})(?!\d)"
 _IN_MOBILE = r"(?<!\d)(\+?91[ -]?)?([6-9]\d{4}[ -]?\d{5})(?!\d)"
 _EMAIL = r"(?<![A-Za-z0-9._%+-])([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})(?![A-Za-z0-9._%+-])"
 _CC = r"(?<!\d)((?:\d{4}[ -]?){3}\d{1,4})(?!\d)"
+#: Card tail printed in a narration line (``AMAZON PAY … CARD 0626 7858``).
+#: A fragment has no length for a Luhn check, so the ``CARD`` label is what
+#: distinguishes it from an amount or an order number.
+_CARD_TAIL = (
+    r"(?i)\bcard\b\s*(?:no\.?|number|ending|last\s*4)?\s*[:#-]?\s*"
+    r"((?:\d{4}[ -])\d{4}|\d{6,8})(?!\d)"
+)
+_CUST_ID = (
+    r"(?i)\bcustomer\s*(?:id|number|no\.?)\b\s*[:#-]?\s*"
+    r"([A-Z]{2,6}[-/]?[0-9]{6,14})(?![A-Za-z0-9])"
+)
+#: Internet-banking login name.  The value must contain a digit: the label and
+#: value often land on neighbouring lines, so without that a trailing word such
+#: as "regularly" would be taken for the ID.
+_NB_USER_ID = (
+    r"(?i)\b(?:net|internet|online)[\s-]*banking\s+(?:user\s*)?id\b\s*[:#=-]?\s*"
+    r"((?=[A-Za-z0-9._@-]*\d)[A-Za-z][A-Za-z0-9._@-]{4,32})(?![A-Za-z0-9._@-])"
+)
 _SECRET = (
     r"(?i)\b(?:api[_-]?key|secret[_-]?key|access[_-]?token|auth[_-]?token|private[_-]?key)"
     r"\b\s*[:=]\s*(\S+)"
@@ -127,9 +145,16 @@ def _validate(entity_type: EntityType, text: str, groups: tuple[str, ...]) -> tu
             return 1.0, "IFSC format valid (bank0branch)"
         return None
     if entity_type is EntityType.CREDIT_CARD:
+        digits = re.sub(r"\D", "", groups[0])
+        if len(digits) < 13:  # tail printed after a CARD label, no Luhn possible
+            return 0.9, "card fragment after a CARD label"
         if is_valid_credit_card(groups[0]):
             return 1.0, "Luhn checksum valid"
         return None
+    if entity_type is EntityType.CUSTOMER_ID:
+        return 0.9, "customer-ID field (bank prefix + digits)"
+    if entity_type is EntityType.USER_ID:
+        return 0.85, "net-banking user-ID field"
     if entity_type is EntityType.DATE_OF_BIRTH:
         d, m, y = groups
         month = _MONTHS.get(m[:3].lower()) if m.isalpha() else int(m)
@@ -169,6 +194,9 @@ _RULES: tuple[tuple[EntityType, str, re.Pattern[str], int, int], ...] = (
     (EntityType.PASSWORD, "Password", re.compile(_PW_SPACED), 1, 1),
     (EntityType.DATE_OF_BIRTH, "DOB", re.compile(_DOB_PREFIX + _DMY), 1, 3),
     (EntityType.CREDIT_CARD, "Card", re.compile(_CC), 1, 1),
+    (EntityType.CREDIT_CARD, "Card-tail", re.compile(_CARD_TAIL), 1, 1),
+    (EntityType.CUSTOMER_ID, "CustomerID", re.compile(_CUST_ID), 1, 1),
+    (EntityType.USER_ID, "NetBankingID", re.compile(_NB_USER_ID), 1, 1),
     (EntityType.INDIAN_MOBILE, "IN-mobile", re.compile(_IN_MOBILE), 0, 0),
     (EntityType.BANK_ACCOUNT, "BankAcct", re.compile(_BANK_ACCT), 1, 1),
 )

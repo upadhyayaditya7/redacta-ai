@@ -21,6 +21,7 @@ import streamlit as st
 from core import __version__
 from core.audit import build_record
 from core.entities import ENTITY_SPECS, EntityType
+from core.verify import verify_output, verify_text
 from core.ner_detector import ONNX_DIR as NER_ONNX_DIR
 from core.pipeline import RedactionPipeline
 from core.redact import redact_image, redact_pdf, redact_text
@@ -331,13 +332,18 @@ if upload is not None:
                                          _types_from_selection(selected))
                     out_path = tmp / (local_path.stem + ".redacted.txt")
                     out_path.write_text(result.redacted_text, encoding="utf-8")
+                # Re-read what we just produced: detection counts are a claim,
+                # this is the check that the values are actually gone.
+                check = verify_output(out_path, result.report)
                 st.session_state["file_result"] = (upload.name, out_path, result)
+                st.session_state["file_verify"] = check
                 # Audit record for the file run.
                 rec = build_record(
                     source=upload.name,
                     report=result.report,
                     result=result,
                     vault_hints={t: vault_obj.entry_hint(t) for t in result.token_map} if vault_active else None,
+                    verification=check.as_dict(),
                 )
                 st.session_state["file_audit"] = rec.to_json()
             except Exception as exc:  # noqa: BLE001 — surface OCR/parse errors in the UI
@@ -347,10 +353,29 @@ if upload is not None:
         name, out_path, fresult = st.session_state["file_result"]
         out_name = Path(out_path).name
         data = Path(out_path).read_bytes()
+        check = st.session_state.get("file_verify")
+        if check is not None and not check.ok:
+            st.error(
+                f"⛔ Verification failed — {len(check.leaks)} redacted value(s) are still "
+                f"readable in the output. The file is withheld."
+            )
+            for leak in check.leaks[:5]:
+                st.caption(f"• {leak.label} still readable in {leak.where} ({leak.hint})")
+        elif check is not None:
+            st.markdown(
+                '<div class="stat g" style="padding:12px 16px">'
+                '<div class="num" style="font-size:1.25rem">✅ Verified clean</div>'
+                f'<div class="lbl">{check.checked_values} redacted values absent from the output · '
+                f'{check.checked_chars:,} chars re-read</div></div>',
+                unsafe_allow_html=True,
+            )
         st.success(f"Redacted {fresult.redacted_count} entities ({fresult.vaulted_count} vaulted) → {out_name}")
         dl1, dl2 = st.columns(2)
-        dl1.download_button("⬇️  Download redacted file", data, file_name=out_name,
-                            use_container_width=True)
+        if check is None or check.ok:
+            dl1.download_button("⬇️  Download redacted file", data, file_name=out_name,
+                                use_container_width=True)
+        else:
+            dl1.button("⬇️  Download withheld", disabled=True, use_container_width=True)
         if "file_audit" in st.session_state:
             dl2.download_button("🧾  Download audit report (JSON)", st.session_state["file_audit"],
                                 file_name=out_name + ".audit.json", mime="application/json",
@@ -417,6 +442,8 @@ if run_scan or run_redact:
             r3.markdown(f'<div class="stat c"><div class="num">{len(result.redacted_text):,}</div>'
                         f'<div class="lbl">Output chars</div></div>', unsafe_allow_html=True)
             st.write("")
+            tcheck = verify_text(result.redacted_text, result.report)
+            st.success(tcheck.summary()) if tcheck.ok else st.error(tcheck.summary())
             st.markdown('<div class="sec-title">Sanitised document</div>', unsafe_allow_html=True)
             st.code(result.redacted_text or "—", language="text")
             if result.token_map and vault_active:

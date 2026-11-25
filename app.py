@@ -92,6 +92,18 @@ def cmd_scan(args) -> int:
     return 0
 
 
+def _final_path(produced, out: str | None) -> Path:
+    """Honour --out by moving the file the redactor actually wrote."""
+    written = Path(produced)
+    if not out:
+        return written
+    target = Path(out)
+    if target != written:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        written.replace(target)
+    return target
+
+
 def cmd_redact(args) -> int:
     src = Path(args.file)
     pipeline = _build_pipeline(args)
@@ -100,14 +112,14 @@ def cmd_redact(args) -> int:
     if ext == ".pdf":
         from core.redact import redact_pdf
 
-        result, out = redact_pdf(src, pipeline, vault, _parse_types(args.types))
-        out = Path(args.out) if args.out else Path(out)
+        result, produced = redact_pdf(src, pipeline, vault, _parse_types(args.types))
+        out = _final_path(produced, args.out)
         report = result.report
     elif ext in {".png", ".jpg", ".jpeg", ".bmp", ".webp"}:
         from core.redact import redact_image
 
-        result, out = redact_image(src, pipeline, vault, _parse_types(args.types))
-        out = Path(args.out) if args.out else Path(out)
+        result, produced = redact_image(src, pipeline, vault, _parse_types(args.types))
+        out = _final_path(produced, args.out)
         report = result.report
     else:
         text = src.read_text(encoding="utf-8")
@@ -117,6 +129,14 @@ def cmd_redact(args) -> int:
         out.write_text(result.redacted_text, encoding="utf-8")
     print(f"Redacted {result.redacted_count} entities "
           f"({result.vaulted_count} vaulted, rest irreversible) → {out}")
+
+    from core.verify import verify_output
+
+    check = verify_output(out, report)
+    print(check.summary())
+    if not check.ok:
+        for leak in check.leaks:
+            print(f"  ! {leak.label} still readable in {leak.where}: {leak.hint}")
     if result.token_map and args.show_tokens:
         print("\nTokens created:")
         for token in result.token_map:
@@ -127,11 +147,12 @@ def cmd_redact(args) -> int:
             source=str(args.file), report=report, result=result,
             vault_hints={t: vault.entry_hint(t) for t in result.token_map} if vault else None,
             sha256_hex=_sha256(src),
+            verification=check.as_dict(),
         )
         rp = _report_path(args, out)
         rp.write_text(rec.to_json(), encoding="utf-8")
         print(f"Audit report → {rp}")
-    return 0
+    return 0 if check.ok else 2
 
 
 def cmd_reveal(args) -> int:

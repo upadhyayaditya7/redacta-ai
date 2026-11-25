@@ -58,6 +58,7 @@ class AuditRecord:
     redacted_count: int
     vaulted_count: int
     entities: list[AuditEntry] = field(default_factory=list)
+    verification: dict | None = None    # output re-read: leaks found, or none
     tool: str = f"{APP_NAME} {__version__}"
     timestamp: str = field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -73,6 +74,7 @@ def build_record(
     result: RedactionResult,
     vault_hints: dict[str, str] | None = None,
     sha256_hex: str | None = None,
+    verification: dict | None = None,
 ) -> AuditRecord:
     """Assemble an audit record from a pipeline report + redaction result.
 
@@ -121,6 +123,7 @@ def build_record(
         redacted_count=result.redacted_count,
         vaulted_count=result.vaulted_count,
         entities=entries,
+        verification=verification,
     )
 
 

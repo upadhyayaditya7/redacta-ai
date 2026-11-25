@@ -44,6 +44,10 @@ protects.
 - **Batch mode** — `python app.py batch inbox/ [--watch]` redacts every
   document in a folder (text/PDF/image); `--watch` keeps polling for new
   arrivals, drop-folder style.
+- **Verified output** — detection counts are a claim, so the produced file is
+  re-read afterwards (PDF text layer, metadata, annotations) and every replaced
+  value is searched for again. A file that still leaks is flagged, the UI
+  withholds the download, and the CLI exits non-zero.
 - **Audit trail** — every run emits a JSON report of *what* was detected and
   *what action* was taken (vaulted vs irreversible), with hints only — no raw
   values — so the report is safe to archive for compliance.
@@ -66,7 +70,7 @@ python app.py models                          # model stack + AI Hub targets
 streamlit run frontend/app.py                 # the UI
 ```
 
-Tests: `python -m pytest tests -q` (52 passing).
+Tests: `python -m pytest tests -q` (57 passing).
 
 ## Architecture
 
@@ -122,7 +126,7 @@ hidden: naive int8 quantisation collapses the model (8.9% argmax agreement,
 ## Status
 
 Working pipeline (detect → explain → redact → vault → reveal → batch → audit),
-52 tests passing. AI tier exported to ONNX, verified, benchmarked, compiled to
+57 tests passing. AI tier exported to ONNX, verified, benchmarked, compiled to
 a QNN context binary, and executed on the X Elite HTP (findings: `npu.md`).
 Roadmap: NPU-viable detector head, embedding vocabulary pruning, OCR polish.
 

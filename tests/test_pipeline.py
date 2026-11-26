@@ -191,3 +191,63 @@ def test_verified_regex_outranks_a_confident_ner_span():
     kept = _resolve_overlaps([ner, rx])
     assert len(kept) == 1
     assert kept[0].entity_type is EntityType.CREDIT_CARD
+
+
+def test_names_after_holder_and_payee_labels_are_detected():
+    text = "Account holder Aarav Sharma Customer ID MNRB00184732 Payment to Rohan Verma"
+    names = [s.text for s in RegexDetector().detect(text).spans if s.entity_type is EntityType.PERSON]
+    assert names == ["Aarav Sharma", "Rohan Verma"]
+
+
+def test_nominee_table_name_is_detected():
+    text = "Nominee Relationship Mobile E-mail Share Meera Sharma Spouse +91 7954174143"
+    names = [s.text for s in RegexDetector().detect(text).spans if s.entity_type is EntityType.PERSON]
+    assert names == ["Meera Sharma"]
+
+
+def test_name_label_on_one_line_does_not_swallow_the_next_field():
+    text = "Account Holder : Aarav Sharma\nAadhaar        : 658325595435"
+    spans = RegexDetector().detect(text).spans
+    assert [s.text for s in spans if s.entity_type is EntityType.PERSON] == ["Aarav Sharma"]
+    assert [s.text for s in spans if s.entity_type is EntityType.AADHAAR] == ["658325595435"]
+
+
+def test_organisations_are_not_redacted_as_people():
+    for text in (
+        "Payment to BIGBASKET RETAIL LTD UPI2863057667",
+        "TRANSFER TO AMAZON PAY INDIA PVT LTD",
+        "Payment to Amazon Pay India Pvt Ltd",
+    ):
+        spans = RegexDetector().detect(text).spans
+        assert not [s for s in spans if s.entity_type is EntityType.PERSON], text
+
+
+def test_postal_address_ending_in_a_pin_is_detected():
+    text = (
+        "Correspondence address Flat 704, Sea Breeze Residency, 14 Linking Road, "
+        "Bandra West, Mumbai 400050 Home branch Bandra West"
+    )
+    spans = [s for s in RegexDetector().detect(text).spans if s.entity_type is EntityType.LOCATION]
+    assert spans and spans[0].text.startswith("Flat 704")
+    assert spans[0].text.endswith("400050")
+
+
+def test_bank_letterhead_address_is_not_flagged():
+    text = "Meridian House, 3rd Floor, Plot 12, Bandra Kurla Complex, Mumbai 400051"
+    spans = RegexDetector().detect(text).spans
+    assert not [s for s in spans if s.entity_type is EntityType.LOCATION]
+
+
+def test_statement_redaction_removes_names_and_address_but_keeps_labels():
+    text = (
+        "Account holder Aarav Sharma\n"
+        "Correspondence address Flat 704, Sea Breeze Residency, 14 Linking Road, "
+        "Bandra West, Mumbai 400050\n"
+        "Payment to Rohan Verma"
+    )
+    report = RedactionPipeline(use_ner=False).analyze(text)
+    out = redact_text(text, report, None).redacted_text
+    for value in ("Aarav Sharma", "Rohan Verma", "Flat 704", "400050"):
+        assert value not in out
+    for label in ("Account holder", "Correspondence address", "Payment to"):
+        assert label in out

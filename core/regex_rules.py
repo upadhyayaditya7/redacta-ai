@@ -124,6 +124,64 @@ _SECRET_SPACED = (
 _DOB_PREFIX = r"(?i)(?:d\.?o\.?b\.?|dob|date of birth|birth date)\s*[:=-]?\s*"
 _DMY = r"(\d{1,2})[ \-/.]([A-Za-z]{3,9}|\d{1,2})[ \-/.](\d{4})"
 
+# --- Anchored free-text rules -------------------------------------------
+#
+# NER is optional (GLiNER) and absent on most installs, so the deterministic
+# floor has to cover what a statement names in prose: the holder and payees,
+# and the postal address.  Both are anchored on the label real documents use
+# ("Account holder", "Payment to", "Correspondence address") instead of being
+# guessed from capitalisation in running text.
+#
+# Field labels keep leaking into a greedy multi-word name, so no name word may
+# be one of the words below: "Account Holder : Aarav Sharma / Aadhaar" has to
+# stop at "Sharma" rather than eat the next line's label.
+_NAME_STOP_WORDS = frozenset(
+    """account active address aadhaar balance bank banking branch card chief
+    city contact customer date delivered deposit designation details email
+    holder ifsc limit manager mobile name nominee note number officer page pan
+    primary product reference registered relationship retail reward salary
+    share spouse statement status transaction transfer type upi valid value
+    verified withdrawal""".split()
+)
+_NAME_STOP_RX = "|".join(sorted(word.capitalize() for word in _NAME_STOP_WORDS))
+_NAME_WORD = rf"(?!(?:{_NAME_STOP_RX})\b)[A-Z][a-z]{{2,}}"
+#: Words of one name are joined by spaces, never by a newline — otherwise a
+#: three-word match runs off the end of the line and eats the next field's label.
+_NAME = rf"({_NAME_WORD}(?:[ \t]+{_NAME_WORD}){{1,2}})"
+#: "Account holder Aarav Sharma", "Payment to Rohan Verma"
+_NAME_LABELED = (
+    r"(?i:\b(?:account\s*holder|joint\s*holder|primary\s*holder|payment\s+to"
+    r"|transfer\s+to|remitter|beneficiary)\b)[:\s]+" + _NAME
+)
+#: Nominee tables print the name after a "Share" column header.
+_NAME_NOMINEE = r"(?i:\bnominee\b)[^.]{0,80}?(?i:\bshare\b)\s+" + _NAME
+#: Other labels a KYC/statement page puts a person behind.
+_NAME_TITLED = (
+    r"(?i:\b(?:customer\s+name|name\s+on\s+card|co-?applicant|addressee"
+    r"|beneficiary\s+name|authorised\s+signatory|authorized\s+signatory"
+    r"|nodal\s+officer|grievance\s+officer|relationship\s+manager"
+    r"|branch\s+manager)\b)[:\s-]+"
+    + _NAME
+)
+#: Signature block: the name, then the role it signs for.
+_NAME_SIGNATURE = _NAME + r"\s*\(\s*(?i:account\s*holder|joint\s*holder|authorised|authorized)"
+#: Beneficiary/saved-payee table rows put an account number right after the name.
+_NAME_TABLE_ROW = _NAME + r"\s+(?=\d{11,18}\b)"
+
+#: Everything from the address body to the six-digit PIN that closes it.
+_ADDRESS_BODY = r"([^.;|]{10,120}?[1-9]\d{5})(?!\d)"
+_ADDRESS_LABELED = (
+    r"(?i:\b(?:correspondence|registered|permanent|residential|mailing"
+    r"|communication)\s+address\b|\bcard\s+delivered\s+to\b)[:\s]+" + _ADDRESS_BODY
+)
+#: Unlabelled but unmistakably residential: "Flat 12, … 400001".
+_ADDRESS_RESIDENTIAL = (
+    r"(?i:\b(?:flat|apartment|villa|residency|society|colony|nagar)\b)" + _ADDRESS_BODY
+)
+#: Company names can pass the title-case test; they must never be vaulted as people.
+_ORG_TAIL = r"(?i)\b(?:pvt|ltd|limited|llp|inc|bank|india|insurance|technologies|services)\b"
+_COMPANY_TAIL = r"(?i)\b(?:pvt|ltd|limited|llp|inc)\b"
+
 _MONTHS = {
     "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
     "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
@@ -163,6 +221,21 @@ def _validate(entity_type: EntityType, text: str, groups: tuple[str, ...]) -> tu
         return None
     if entity_type is EntityType.BANK_ACCOUNT:
         return 0.6, "11-18 digit number (checksum unavailable)"
+    if entity_type is EntityType.PERSON:
+        words = [w.strip(".,") for w in text.split()]
+        if not 2 <= len(words) <= 3:
+            return None
+        if any(w.lower() in _NAME_STOP_WORDS for w in words):
+            return None
+        if re.search(_ORG_TAIL, text):
+            return None
+        return 0.85, "name after a holder/payee label"
+    if entity_type is EntityType.LOCATION:
+        if text.count(",") < 1 or not re.search(r"\b[1-9]\d{5}\b", text):
+            return None
+        if re.search(_COMPANY_TAIL, text):
+            return None
+        return 0.85, "postal address ending in a PIN code"
     if entity_type is EntityType.SECRET_KEY:
         if groups[0] and re.fullmatch(_KEY_PREFIX, groups[0]):
             return 1.0, "Known secret-key prefix (sk_/whsec_/AKIA/…)"
@@ -197,6 +270,13 @@ _RULES: tuple[tuple[EntityType, str, re.Pattern[str], int, int], ...] = (
     (EntityType.CREDIT_CARD, "Card-tail", re.compile(_CARD_TAIL), 1, 1),
     (EntityType.CUSTOMER_ID, "CustomerID", re.compile(_CUST_ID), 1, 1),
     (EntityType.USER_ID, "NetBankingID", re.compile(_NB_USER_ID), 1, 1),
+    (EntityType.PERSON, "Name-label", re.compile(_NAME_LABELED), 1, 1),
+    (EntityType.PERSON, "Name-nominee", re.compile(_NAME_NOMINEE), 1, 1),
+    (EntityType.PERSON, "Name-titled", re.compile(_NAME_TITLED), 1, 1),
+    (EntityType.PERSON, "Name-signature", re.compile(_NAME_SIGNATURE), 1, 1),
+    (EntityType.PERSON, "Name-row", re.compile(_NAME_TABLE_ROW), 1, 1),
+    (EntityType.LOCATION, "Address-label", re.compile(_ADDRESS_LABELED), 1, 1),
+    (EntityType.LOCATION, "Address", re.compile(_ADDRESS_RESIDENTIAL), 1, 1),
     (EntityType.INDIAN_MOBILE, "IN-mobile", re.compile(_IN_MOBILE), 0, 0),
     (EntityType.BANK_ACCOUNT, "BankAcct", re.compile(_BANK_ACCT), 1, 1),
 )

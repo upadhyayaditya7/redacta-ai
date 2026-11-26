@@ -1,11 +1,13 @@
 # Redacta AI — Streamlit theme & runtime config
+# Neutral ink palette: the accent lives in the app's own CSS, not the theme,
+# so widgets stay monochrome and the page reads like a product console.
 
 [theme]
 base = "dark"
-primaryColor = "#8b5cf6"
-backgroundColor = "#0b0f1a"
-secondaryBackgroundColor = "#131a2b"
-textColor = "#e8ebf5"
+primaryColor = "#ededf0"
+backgroundColor = "#08080a"
+secondaryBackgroundColor = "#0e0e11"
+textColor = "#ececee"
 
 [browser]
 gatherUsageStats = false

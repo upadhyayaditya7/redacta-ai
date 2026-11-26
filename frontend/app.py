@@ -72,18 +72,18 @@ background:linear-gradient(180deg,#fff,#d5d5da);box-shadow:0 1px 0 rgba(255,255,
 .mark .bar{position:absolute;left:4px;right:4px;top:8px;height:7px;border-radius:1.5px;
 background:#09090b}
 .wordmark{font-size:13.5px;font-weight:650;letter-spacing:-.01em;color:#f3f3f5}
-.chip{font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;color:var(--dim);
+.chip{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--dim);
 border:1px solid var(--line);border-radius:4px;padding:2px 6px;text-transform:uppercase}
 .spacer{flex:1}
 .live{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);
-font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
 .live i{width:6px;height:6px;border-radius:50%;background:var(--ok);flex:none;
 box-shadow:0 0 0 3px rgba(95,217,141,.13)}
 .live.sep{border-left:1px solid var(--line);padding-left:14px;margin-left:4px}
 
 /* ------------------------------------------------------ hero block */
 .hero{padding:46px 0 24px;max-width:780px}
-.eyebrow{font-family:var(--mono);font-size:9.5px;letter-spacing:.22em;
+.eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.22em;
 text-transform:uppercase;color:var(--trace);margin:0 0 15px}
 .hero h1{font-family:var(--display);font-size:clamp(27px,3vw,39px);line-height:1.07;
 letter-spacing:-.035em;font-weight:600;color:#f5f5f7;margin:0 0 17px}
@@ -93,7 +93,7 @@ background:linear-gradient(transparent 61%,rgba(216,242,78,.26) 61%,rgba(216,242
 .lede b{color:#dcdce3;font-weight:600}
 .spec{display:flex;flex-wrap:wrap;align-items:center;border-top:1px solid var(--line);
 border-bottom:1px solid var(--line);padding:11px 0;margin:0 0 26px}
-.spec span{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+.spec span{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
 color:var(--trace);padding:0 14px;border-left:1px solid var(--line);white-space:nowrap}
 .spec span:first-child{padding-left:0;border-left:none}
 .spec span:last-child{margin-left:auto;padding-right:0;border-left:none;color:var(--dim)}
@@ -106,9 +106,9 @@ background:var(--panel)!important;padding:2px!important}
 [data-testid=stMain] [data-testid=stVerticalBlockBorderWrapper] [data-testid=stVerticalBlock]{gap:.55rem}
 .panel-head{display:flex;align-items:baseline;justify-content:space-between;gap:18px;
 margin:0 0 9px;flex-wrap:wrap}
-.panel-head .eyebrow{margin:0;font-size:9px;color:var(--dim);letter-spacing:.18em}
-.panel-head .meta{font-family:var(--mono);font-size:9.5px;letter-spacing:.04em;color:var(--trace)}
-.count{font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--trace);
+.panel-head .eyebrow{margin:0;font-size:10px;color:var(--dim);letter-spacing:.18em}
+.panel-head .meta{font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;color:var(--trace)}
+.count{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--trace);
 text-align:right;padding-top:9px}
 
 /* ------------------------------------------------------- text input */
@@ -150,7 +150,7 @@ background:transparent!important;padding:0!important}
 border-radius:0!important;padding:0 0 11px!important;position:relative;
 box-shadow:none!important;height:auto!important;min-height:0!important}
 [data-testid=stTab] > div[data-rac]{display:none!important}
-[data-testid=stTab] p{font-family:var(--mono)!important;font-size:10px!important;
+[data-testid=stTab] p{font-family:var(--mono)!important;font-size:11px!important;
 letter-spacing:.14em;text-transform:uppercase;color:var(--trace)!important;
 font-weight:500!important;line-height:1.4!important;margin:0!important}
 [data-testid=stTab]:hover p{color:#a8a8b2!important}
@@ -165,13 +165,13 @@ gap:14px;align-items:center;padding:10px 14px;border-bottom:1px solid #17171c}
 .frow:last-child{border-bottom:none}
 .frow.body:hover{background:#101015}
 .frow.hdr{background:#0f0f13;padding:8px 14px}
-.frow.hdr span{font-family:var(--mono);font-size:8.5px;letter-spacing:.18em;
+.frow.hdr span{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;
 text-transform:uppercase;color:#5a5a64}
-.f-type{font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;
+.f-type{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;
 color:#a3a3ae;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .f-val{font-family:var(--mono);font-size:12px;color:#f2f2f6;white-space:nowrap;
 overflow:hidden;text-overflow:ellipsis}
-.f-why{font-size:11.5px;color:var(--trace);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.f-why{font-size:12px;color:var(--trace);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .f-why b{color:#a9a9b5;font-weight:500;font-family:var(--mono);font-size:10.5px}
 .f-score{font-family:var(--mono);font-size:11px;text-align:right;color:var(--muted)}
 .f-score.hi{color:var(--ok)}
@@ -189,14 +189,14 @@ border-radius:10px;overflow:hidden;background:#0b0b0e;margin:2px 0 16px}
 .stat-num{font-family:var(--mono);font-size:20px;font-weight:500;letter-spacing:-.02em;
 line-height:1.25;color:#f2f2f5}
 .stat-num.accent{color:var(--accent)}
-.stat-lbl{font-family:var(--mono);font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;
+.stat-lbl{font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;
 color:#5f5f69;margin-top:5px}
 
 /* -------------------------------------------------------- verification */
 .verify{display:flex;align-items:center;gap:11px;border:1px solid rgba(95,217,141,.26);
 background:rgba(95,217,141,.055);border-radius:9px;padding:10px 14px;
 font-size:12.5px;color:#c3e9d2;margin:0 0 14px;flex-wrap:wrap}
-.verify .g{font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;
+.verify .g{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;
 color:#8fe3ae;border:1px solid rgba(95,217,141,.32);border-radius:4px;padding:2px 7px;flex:none}
 .verify b{font-family:var(--mono);font-weight:500;color:#effff5}
 .verify.bad{border-color:rgba(239,111,111,.32);background:rgba(239,111,111,.07);color:#f2bcbc}
@@ -234,7 +234,7 @@ min-height:0!important;transition:border-color .12s ease,background .12s ease}
 [data-testid=stFileUploaderDropzoneInstructions] span{font-family:var(--mono)!important;
 font-size:11px!important;color:var(--muted)!important;letter-spacing:.02em}
 [data-testid=stFileUploaderDropzoneInstructions] small{font-family:var(--mono)!important;
-font-size:9.5px!important;color:var(--trace)!important;letter-spacing:.04em}
+font-size:10.5px!important;color:var(--trace)!important;letter-spacing:.04em}
 [data-testid=stFileUploaderDropzone] button{height:28px!important;min-height:28px!important;
 font-size:11px!important;padding:0 11px!important;border-radius:7px!important;
 background:#17171d!important;border:1px solid var(--line2)!important;color:#dcdce4!important}
@@ -244,7 +244,7 @@ background:#17171d!important;border:1px solid var(--line2)!important;color:#dcdc
 .section-head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;
 margin:30px 0 12px;flex-wrap:wrap}
 .section-head .eyebrow{margin:0}
-.section-head .meta{font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;
+.section-head .meta{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;
 color:var(--trace);text-transform:uppercase}
 
 /* --------------------------------------------------------------- rail */
@@ -254,11 +254,13 @@ color:var(--trace);text-transform:uppercase}
 .rail-head{display:flex;align-items:center;gap:10px;padding:0 0 17px;
 border-bottom:1px solid var(--line);margin:0 0 4px}
 .rail-name{font-size:13px;font-weight:650;color:#f2f2f5;letter-spacing:-.01em}
-.rail-ver{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;
+.rail-ver{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
 color:var(--trace);margin-top:2px}
-.rail-label{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.2em;
-text-transform:uppercase;color:#565660;margin:18px 0 8px}
-.rail-note{display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:9.5px;
+.rail-label{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.2em;
+text-transform:uppercase;color:#6b6b76;margin:18px 0 8px}
+[data-testid=stSidebar] p.rail-help{font-size:11.5px!important;line-height:1.62;color:#90909b!important;
+margin:0 0 10px!important;font-weight:400!important;max-width:100%}
+.rail-note{display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:10.5px;
 letter-spacing:.04em;color:var(--trace);margin:9px 0 0}
 .rail-note i{width:5px;height:5px;border-radius:50%;background:var(--trace);flex:none}
 .rail-note i.ok{background:var(--ok)}
@@ -280,12 +282,12 @@ font-size:10.5px!important}
 [data-testid=stExpander]{border:1px solid var(--line)!important;border-radius:9px!important;
 background:transparent!important;margin-top:2px}
 [data-testid=stExpander] summary{padding:9px 12px!important}
-[data-testid=stExpander] summary p{font-family:var(--mono);font-size:9.5px!important;
+[data-testid=stExpander] summary p{font-family:var(--mono);font-size:10.5px!important;
 letter-spacing:.14em;text-transform:uppercase;color:var(--muted)!important}
 [data-testid=stExpander] svg{color:#565660}
 [data-testid=stSidebar] hr{border-color:var(--line);margin:18px 0 12px}
 [data-testid=stSidebar] .stCaption p,[data-testid=stSidebar] [data-testid=stCaptionContainer] p{
-font-family:var(--mono);font-size:9.5px!important;color:var(--trace)!important;letter-spacing:.03em}
+font-family:var(--mono);font-size:10.5px!important;color:var(--trace)!important;letter-spacing:.03em}
 [data-testid=stSidebar] .stCaption a{color:#a8a8b4!important;text-decoration:none;
 border-bottom:1px solid var(--line2)}
 .toggle-label{font-size:12px;color:#dcdce3}
@@ -424,6 +426,12 @@ with st.sidebar:
         st.session_state.pipeline = RedactionPipeline(use_ner=use_ner)
 
     st.markdown('<span class="rail-label">Vault</span>', unsafe_allow_html=True)
+    st.markdown(
+        '<p class="rail-help">Keeps every replaced value encrypted on this device. '
+        'Unlock it to swap redactions back into a document later; leave it locked and '
+        'redactions are permanent.</p>',
+        unsafe_allow_html=True,
+    )
     vault_pass = st.text_input(
         "Vault passphrase", type="password", label_visibility="collapsed",
         placeholder="Passphrase",
@@ -465,6 +473,11 @@ with st.sidebar:
         )
 
     st.markdown('<span class="rail-label">Workspace</span>', unsafe_allow_html=True)
+    st.markdown(
+        '<p class="rail-help">Load a sample statement or clear the editor, then choose '
+        'which identifier types to look for.</p>',
+        unsafe_allow_html=True,
+    )
     b_col1, b_col2 = st.columns(2)
     b_col1.button("Sample", use_container_width=True, on_click=_load_sample,
                   help="Fresh fake bank statement — checksum-valid, nothing real, nothing networked.")

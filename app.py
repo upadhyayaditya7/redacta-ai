@@ -129,6 +129,9 @@ def cmd_redact(args) -> int:
         out.write_text(result.redacted_text, encoding="utf-8")
     print(f"Redacted {result.redacted_count} entities "
           f"({result.vaulted_count} vaulted, rest irreversible) → {out}")
+    if result.metadata_dropped or result.annotations_removed:
+        print(f"  Also cleared {result.metadata_dropped} metadata field(s) and "
+              f"removed {result.annotations_removed} annotation(s)")
 
     from core.verify import verify_output
 

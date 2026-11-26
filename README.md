@@ -47,7 +47,9 @@ protects.
 - **Verified output** — detection counts are a claim, so the produced file is
   re-read afterwards (PDF text layer, metadata, annotations) and every replaced
   value is searched for again. A file that still leaks is flagged, the UI
-  withholds the download, and the CLI exits non-zero.
+  withholds the download, and the CLI exits non-zero. PDF redaction also drops
+  `/Info` entries that name a redacted value and removes page annotations, so
+  the check has nothing left to catch.
 - **Audit trail** — every run emits a JSON report of *what* was detected and
   *what action* was taken (vaulted vs irreversible), with hints only — no raw
   values — so the report is safe to archive for compliance.
@@ -70,7 +72,7 @@ python app.py models                          # model stack + AI Hub targets
 streamlit run frontend/app.py                 # the UI
 ```
 
-Tests: `python -m pytest tests -q` (57 passing).
+Tests: `python -m pytest tests -q` (59 passing).
 
 ## Architecture
 

@@ -30,6 +30,8 @@ class RedactionResult:
     redacted_count: int = 0
     vaulted_count: int = 0
     token_map: dict[str, str] = field(default_factory=dict)  # token -> original
+    metadata_dropped: int = 0      # document-info entries that named a redacted value
+    annotations_removed: int = 0   # page annotations dropped from the output
 
 
 def _mask(entity_type: EntityType, text: str) -> str:
@@ -210,6 +212,76 @@ def _scrub_text_layer(page, pdf, values: tuple[str, ...]) -> None:
         page.replace_contents(stream)
 
 
+# Descriptive /Info fields are dropped wholesale: they are free text written by
+# whoever produced the document, so a "Subject: statement for <holder>" line
+# leaks a name that no text rule can judge.  Timestamps carry no identity.
+_INFO_KEEP = ("/CreationDate", "/ModDate")
+
+
+def _clean_metadata(writer, reader) -> int:
+    """Give the redacted copy a metadata dict that names nobody.
+
+    A fresh ``PdfWriter`` does not inherit ``/Info``, but a copied or XMP
+    packet can travel with the file, so the output is given an explicit dict:
+    producer, plus the original timestamps.  Everything descriptive is
+    removed rather than masked — a half-masked author field looks sanitised
+    and still identifies the document.
+    """
+    dropped = 0
+    clean: dict[str, str] = {}
+    try:
+        info = dict(reader.metadata or {})
+    except Exception:  # noqa: BLE001 — a malformed info dict must not block redaction
+        info = {}
+    for key, value in info.items():
+        text = "" if value is None else str(value)
+        if not text:
+            continue
+        if str(key) in _INFO_KEEP:
+            clean[str(key)] = text
+        else:
+            dropped += 1
+    clean["/Producer"] = "Redacta AI"
+    try:
+        writer.add_metadata(clean)
+    except Exception:  # noqa: BLE001 — never fail a redaction over cosmetics
+        pass
+    try:
+        writer.xmp_metadata = None
+    except Exception:  # noqa: BLE001
+        pass
+    return dropped
+
+
+def _strip_page_extras(page) -> int:
+    """Remove annotations and page-level XMP from an output page.
+
+    Annotations are dropped whole rather than edited: their text, author and
+    appearance stream all survive an edit, and an annotation renders *above*
+    the black boxes.  XMP is dropped because a page can carry its own packet.
+    Returns the number of annotations removed.
+    """
+    from pypdf.generic import NameObject
+
+    removed = 0
+    raw = page.get("/Annots")
+    if raw is not None:
+        try:
+            removed = len(raw)
+        except TypeError:
+            removed = 1
+        try:
+            del page[NameObject("/Annots")]
+        except Exception:  # noqa: BLE001 — leave the page intact if this fails
+            removed = 0
+    if "/Metadata" in page:
+        try:
+            del page[NameObject("/Metadata")]
+        except Exception:  # noqa: BLE001
+            pass
+    return removed
+
+
 def _wrap_text(text: str, width: int = 110) -> str:
     """Wrap long lines (used only by the no-reportlab text fallback)."""
     import textwrap
@@ -302,11 +374,13 @@ def redact_pdf(
             # belongs to the writer, so attach it first, then scrub and merge.
             writer.add_page(page)
             target = writer.pages[-1]
+            result.annotations_removed += _strip_page_extras(target)
             _scrub_text_layer(target, writer, values)
             marks = _page_marks(local, chunks, tokens)
             if marks:
                 overlay = _overlay_reader(target, marks)
                 target.merge_page(overlay.pages[0])
+        result.metadata_dropped = _clean_metadata(writer, reader)
         with open(out_path, "wb") as fh:
             writer.write(fh)
     finally:

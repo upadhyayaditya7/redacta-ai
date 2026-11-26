@@ -370,6 +370,11 @@ if upload is not None:
                 unsafe_allow_html=True,
             )
         st.success(f"Redacted {fresult.redacted_count} entities ({fresult.vaulted_count} vaulted) → {out_name}")
+        if fresult.metadata_dropped or fresult.annotations_removed:
+            st.caption(
+                f"🧽 Also cleared {fresult.metadata_dropped} metadata field(s) and removed "
+                f"{fresult.annotations_removed} annotation(s) from the copy."
+            )
         dl1, dl2 = st.columns(2)
         if check is None or check.ok:
             dl1.download_button("⬇️  Download redacted file", data, file_name=out_name,

@@ -96,6 +96,73 @@ def test_every_page_is_redacted(tmp_path: Path) -> None:
     assert "Page one" in text and "Page two" in text
 
 
+def _add_note(path: Path, contents: str) -> None:
+    """Attach a sticky-note annotation, the way a real review copy carries one."""
+    from pypdf import PdfWriter
+    from pypdf.generic import (
+        ArrayObject,
+        DictionaryObject,
+        NameObject,
+        NumberObject,
+        TextStringObject,
+    )
+
+    writer = PdfWriter(clone_from=str(path))
+    page = writer.pages[0]
+    note = DictionaryObject({
+        NameObject("/Type"): NameObject("/Annot"),
+        NameObject("/Subtype"): NameObject("/Text"),
+        NameObject("/Rect"): ArrayObject(
+            [NumberObject(10), NumberObject(10), NumberObject(40), NumberObject(40)]
+        ),
+        NameObject("/Contents"): TextStringObject(contents),
+        NameObject("/T"): TextStringObject("Reviewer"),
+    })
+    page[NameObject("/Annots")] = ArrayObject([note])
+    with open(path, "wb") as fh:
+        writer.write(fh)
+
+
+def test_metadata_naming_the_account_holder_is_dropped(tmp_path: Path) -> None:
+    """Verification flags a leak in /Author — so the redactor has to clear it."""
+    from core.verify import verify_file
+
+    src = tmp_path / "meta.pdf"
+    canvas = pdfcanvas.Canvas(str(src), pagesize=(595, 842))
+    canvas.setAuthor("YYSGB5432H")
+    canvas.setTitle("Statement of account")
+    canvas.drawString(40, 800, "Account holder PAN: YYSGB5432H")
+    canvas.showPage()
+    canvas.save()
+
+    result, out = redact_pdf(src, RedactionPipeline(use_ner=False), None)
+
+    assert result.metadata_dropped >= 1
+    info = dict(PdfReader(str(out)).metadata or {})
+    assert "YYSGB5432H" not in " ".join(str(v) for v in info.values())
+    # Descriptive fields go wholesale: a "Subject: statement for <holder>"
+    # names a person without ever matching a rule.
+    assert "/Author" not in info and "/Title" not in info
+    assert info.get("/Producer") == "Redacta AI"
+    assert verify_file(out, result.report).ok
+
+
+def test_annotations_are_removed_from_the_redacted_copy(tmp_path: Path) -> None:
+    """A note renders above the black boxes, so it cannot just be edited."""
+    from core.verify import verify_file
+
+    src = tmp_path / "note.pdf"
+    _write_pdf(src, [["Statement of account", "Account holder PAN: YYSGB5432H"]])
+    _add_note(src, "call the holder on YYSGB5432H")
+    assert PdfReader(str(src)).pages[0].get("/Annots")
+
+    result, out = redact_pdf(src, RedactionPipeline(use_ner=False), None)
+
+    assert result.annotations_removed == 1
+    assert not (PdfReader(str(out)).pages[0].get("/Annots") or [])
+    assert verify_file(out, result.report).ok
+
+
 def test_scanned_pdf_is_refused_instead_of_emptied(tmp_path: Path) -> None:
     """Regression: an image-only PDF used to produce a silent empty document."""
     src = tmp_path / "scan.pdf"

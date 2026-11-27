@@ -67,10 +67,17 @@ background-size:26px 26px;background-position:-2px -2px}
 padding:0 32px;border-bottom:1px solid var(--line);background:rgba(8,8,10,.82);
 -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
 position:sticky;top:0;z-index:80}
-.mark{width:22px;height:22px;border-radius:6px;flex:none;position:relative;
-background:linear-gradient(180deg,#fff,#d5d5da);box-shadow:0 1px 0 rgba(255,255,255,.5) inset}
-.mark .bar{position:absolute;left:4px;right:4px;top:8px;height:7px;border-radius:1.5px;
-background:#09090b}
+/* Mark: a paragraph whose last line has been redacted. Stacked text reads as
+   "document" at 22px, and the blacked-out bottom line is the product in one
+   glyph — no lettering, no gradient noise, three strokes total. */
+.mark{width:22px;height:22px;border-radius:6.5px;flex:none;position:relative;
+background:linear-gradient(180deg,#fdfdfe,#d6d6dc);
+box-shadow:0 1px 0 rgba(255,255,255,.7) inset,0 1px 2px rgba(0,0,0,.45)}
+.mark i{position:absolute;left:5px;height:1.5px;border-radius:1px;background:#a3a3ae}
+.mark i.l1{top:5.5px;width:10px}
+.mark i.l2{top:9px;width:12px}
+.mark .bar{position:absolute;left:5px;top:12.9px;width:9.5px;height:3.4px;border-radius:1.1px;
+background:#0a0a0c;box-shadow:0 .5px 0 rgba(255,255,255,.45)}
 .wordmark{font-size:13.5px;font-weight:650;letter-spacing:-.01em;color:#f3f3f5}
 .chip{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--dim);
 border:1px solid var(--line);border-radius:4px;padding:2px 6px;text-transform:uppercase}
@@ -377,7 +384,7 @@ def _verify_bar(check, bad_prefix: str = "") -> str:
 # ---------------------------------------------------------- top bar ----
 st.markdown(
     f"""<div class="topbar">
-<span class="mark"><span class="bar"></span></span>
+<span class="mark"><i class="l1"></i><i class="l2"></i><span class="bar"></span></span>
 <span class="wordmark">Redacta</span>
 <span class="chip">v{__version__}</span>
 <span class="spacer"></span>
@@ -411,7 +418,7 @@ nothing survived the redaction.</p>
 with st.sidebar:
     st.markdown(
         '<div class="rail-head">'
-        '<span class="mark"><span class="bar"></span></span>'
+        '<span class="mark"><i class="l1"></i><i class="l2"></i><span class="bar"></span></span>'
         "<div><div class=\"rail-name\">Redacta</div>"
         f'<div class="rail-ver">v{__version__} · on-device</div></div>'
         "</div>",

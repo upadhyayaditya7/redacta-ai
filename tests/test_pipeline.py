@@ -160,6 +160,28 @@ def test_card_tail_in_a_narration_line_is_detected():
     assert card[0].reason == "card fragment after a CARD label"
 
 
+def test_transaction_reference_numbers_are_not_read_as_mobiles():
+    """Narration rows glue the mode code to the reference (``POS9974100995``).
+
+    Regression: the digit run was only guarded on its left by ``(?<!\\d)``, so
+    every narration row counted as a phone — 52 transaction references on one
+    statement — and redaction blanked them for no privacy reason.
+    """
+    text = (
+        "Registered mobile +91 6339683276\n"
+        "22/10/2026 AMAZON PAY INDIA PVT LTD POS9974100995 425.00\n"
+        "05/10/2026 SALARY OCT 2026 - EXECUTIVE RESOURCES NEF8036801068 128,450.00\n"
+        "11/10/2026 ZOMATO DISTRICT UPI8311720302 8,710.00\n"
+        "10/10/2026 Transfer to Diya Nair IMP7683891884 6,781.00\n"
+        "09/10/2026 HOME LOAN EMI ECH6686035741 3,266.00\n"
+    )
+    mobiles = [
+        s.text for s in RegexDetector().detect(text).spans
+        if s.entity_type is EntityType.INDIAN_MOBILE
+    ]
+    assert mobiles == ["+91 6339683276"]
+
+
 def test_prose_about_accounts_and_cards_is_not_flagged():
     for text in (
         "Reset your net banking user ID regularly.",

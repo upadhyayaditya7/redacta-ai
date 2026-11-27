@@ -63,7 +63,11 @@ _UPI = (
     r"(?![A-Za-z0-9._-])"
 )
 _BANK_ACCT = r"(?<!\d)(\d{11,18})(?!\d)"
-_IN_MOBILE = r"(?<!\d)(\+?91[ -]?)?([6-9]\d{4}[ -]?\d{5})(?!\d)"
+#: A mobile never touches a word on its left.  Narration lines glue the mode
+#: code to the reference number (``POS9974100995``) and an unanchored digit run
+#: then reads as a phone; requiring a non-alphanumeric boundary keeps
+#: ``+91 6339683276`` and drops every transaction reference.
+_IN_MOBILE = r"(?<![A-Za-z0-9])(\+?91[ -]?)?([6-9]\d{4}[ -]?\d{5})(?!\d)"
 _EMAIL = r"(?<![A-Za-z0-9._%+-])([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})(?![A-Za-z0-9._%+-])"
 _CC = r"(?<!\d)((?:\d{4}[ -]?){3}\d{1,4})(?!\d)"
 #: Card tail printed in a narration line (``AMAZON PAY … CARD 0626 7858``).

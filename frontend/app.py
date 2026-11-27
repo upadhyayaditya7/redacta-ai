@@ -127,8 +127,18 @@ height:34px;min-height:34px;border-radius:8px!important;border:1px solid var(--l
 background:#15151a!important;color:#e2e2e8!important;font-size:12.5px!important;
 font-weight:550!important;letter-spacing:-.005em;padding:0 14px!important;
 box-shadow:none!important;transition:background .12s ease,border-color .12s ease}
-.stButton>button p,.stDownloadButton>button p{font-size:12.5px!important;
+/* Descendant, not child: a button carrying a `help` tooltip is wrapped in an extra
+   div, so `> button` misses it. */
+.stButton button p,.stDownloadButton button p{font-size:12.5px!important;
 font-weight:inherit!important;line-height:1.1!important;color:inherit!important}
+/* Streamlit wraps the label in an ellipsis div whose tall line box parks the text
+   on its baseline, which reads a few pixels low inside a 34px button. */
+.stButton button [data-testid=stMarkdownContainer],
+.stDownloadButton button [data-testid=stMarkdownContainer]{
+display:flex!important;align-items:center!important;justify-content:center!important;
+line-height:1.1!important;height:auto!important;min-height:0!important}
+.stButton button p,.stDownloadButton button p{vertical-align:baseline!important;
+margin:0!important}
 .stButton>button:hover,.stDownloadButton>button:hover{background:#1c1c22!important;
 border-color:#3b3b45!important;color:#fff!important}
 .stButton>button:active,.stDownloadButton>button:active{transform:translateY(1px)}
@@ -265,9 +275,11 @@ letter-spacing:.04em;color:var(--trace);margin:9px 0 0}
 .rail-note i{width:5px;height:5px;border-radius:50%;background:var(--trace);flex:none}
 .rail-note i.ok{background:var(--ok)}
 .rail-note i.warn{background:var(--warn)}
-[data-testid=stSidebar] .stButton>button{width:100%;height:32px;font-size:12px!important;
-background:#14141a!important}
-[data-testid=stSidebar] .stButton>button p{font-size:12px!important}
+/* Buttons carrying a `help` tooltip get a 40px min-height and 4px padding from
+   Streamlit, which makes them sit taller than their neighbours in a row. */
+[data-testid=stSidebar] .stButton button{width:100%;height:32px!important;min-height:32px!important;
+font-size:12px!important;padding:0 14px!important;background:#14141a!important}
+[data-testid=stSidebar] .stButton button p{font-size:12px!important}
 .stTextInput input{background:#0c0c0f!important;border:1px solid var(--line)!important;
 border-radius:8px!important;color:#e8e8ee!important;font-family:var(--mono)!important;
 font-size:11.5px!important;height:34px!important;padding:0 11px!important}

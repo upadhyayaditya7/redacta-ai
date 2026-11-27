@@ -150,6 +150,14 @@ def _overlay_reader(page, marks: list[list]):
     return PdfReader(buffer)
 
 
+def _replace_values(text: str, values: tuple[str, ...]) -> str:
+    """Mask whole redacted values that appear verbatim in *text*."""
+    for value in values:
+        if value in text:
+            text = text.replace(value, _SCRUB_CHAR * len(value))
+    return text
+
+
 def _scrub_literal(literal, values: tuple[str, ...]):
     """Mask redacted values inside one PDF string literal."""
     from pypdf.generic import ByteStringObject, TextStringObject
@@ -162,49 +170,120 @@ def _scrub_literal(literal, values: tuple[str, ...]):
         original = str(literal) if is_text else literal.original_bytes.decode("latin-1")
     except Exception:  # noqa: BLE001 — undecodable literal: leave it alone
         return literal
-    masked = original
-    for value in values:
-        if value in masked:
-            masked = masked.replace(value, _SCRUB_CHAR * len(value))
+    masked = _replace_values(original, values)
     if masked == original:
         return literal
     return TextStringObject(masked) if is_text else ByteStringObject(masked.encode("latin-1", "replace"))
 
 
-def _scrub_text_layer(page, pdf, values: tuple[str, ...]) -> None:
-    """Mask *values* inside the page's text operators.
+def _mask_ranges(text: str, start: int, ranges: list[tuple[int, int]]) -> str:
+    """Mask the characters of *text* that fall inside any redacted range.
+
+    Ranges are offsets into the page text, and *text* is the slice of that page
+    text held by one string literal, starting at *start*.  Working in ranges
+    rather than whole values is what lets a value that wraps across lines — and
+    so is stored in several literals — be masked in every one of them.
+    """
+    if not ranges:
+        return text
+    end = start + len(text)
+    covered = [
+        (max(lo, start) - start, min(hi, end) - start)
+        for lo, hi in ranges
+        if lo < end and hi > start
+    ]
+    if not covered:
+        return text
+    chars = list(text)
+    for lo, hi in covered:
+        for i in range(lo, hi):
+            if chars[i] not in "\r\n":
+                chars[i] = _SCRUB_CHAR
+    return "".join(chars)
+
+
+def _scrub_values(spans) -> tuple[str, ...]:
+    """Fallback search strings for literals that cannot be aligned to the page text.
+
+    A multi-line span is represented by its individual lines, because no single
+    literal holds the whole thing.
+    """
+    values: set[str] = set()
+    for span in spans:
+        text = str(span.text)
+        for line in text.splitlines():
+            line = line.strip()
+            if len(line) >= 6:
+                values.add(line)
+        if "\n" not in text and len(text) >= 3:
+            values.add(text)
+    return tuple(sorted(values, key=len, reverse=True))
+
+
+def _scrub_text_layer(
+    page,
+    pdf,
+    ranges: list[tuple[int, int]],
+    page_text: str,
+    values: tuple[str, ...] = (),
+) -> None:
+    """Mask the redacted ranges inside the page's text operators.
 
     The black boxes hide the glyphs, but the original characters would still
     be copy-pasteable out of the PDF.  Rewriting the string operands keeps
     the layout (only the characters change) and closes that hole.
+
+    Each literal is located in *page_text* by advancing a cursor, so its
+    characters can be masked by offset.  That is why a value broken across
+    several literals still loses every one of its characters; *values* is only
+    a fallback for literals the alignment could not place.
     """
-    if not values:
+    if not ranges and not values:
         return
     contents = page.get_contents()
     if contents is None:
         return
 
-    from pypdf.generic import ContentStream, TextStringObject
+    from pypdf.generic import ByteStringObject, ContentStream, TextStringObject
 
     stream = ContentStream(contents, pdf)
+    cursor = 0
     changed = False
+
+    def scrub(literal):
+        nonlocal cursor, changed
+        is_text = isinstance(literal, TextStringObject)
+        if not (is_text or isinstance(literal, ByteStringObject)):
+            return literal
+        try:
+            original = str(literal) if is_text else literal.original_bytes.decode("latin-1")
+        except Exception:  # noqa: BLE001 — undecodable literal: leave it alone
+            return literal
+        if not original:
+            return literal
+        masked = original
+        start = page_text.find(original, cursor)
+        if start >= 0:
+            cursor = start + len(original)
+            masked = _mask_ranges(original, start, ranges)
+        masked = _replace_values(masked, values)
+        if masked == original:
+            return literal
+        changed = True
+        if is_text:
+            return TextStringObject(masked)
+        return ByteStringObject(masked.encode("latin-1", "replace"))
+
     new_operations = []
     for operands, operator in stream.operations:
         if operator in (b"Tj", b"'", b'"') and operands:
             operands = list(operands)
-            masked = _scrub_literal(operands[-1], values)
-            if masked is not operands[-1]:
-                operands[-1] = masked
-                changed = True
+            operands[-1] = scrub(operands[-1])
         elif operator == b"TJ" and operands:
             array = operands[0]
             if hasattr(array, "__setitem__"):
-                for i, item in enumerate(array):
-                    if isinstance(item, TextStringObject):
-                        masked = _scrub_literal(item, values)
-                        if masked is not item:
-                            array[i] = masked
-                            changed = True
+                for i in range(len(array)):
+                    array[i] = scrub(array[i])
         new_operations.append((operands, operator))
 
     if changed:
@@ -362,20 +441,17 @@ def redact_pdf(
                 for span in selected
                 if span.start < end and span.end > start
             ]
-            # Mask only the page's own values: a common short value must not
-            # shred every other page's text.  Very short or multi-line values
-            # are skipped here — the box still covers them visually.
-            values = tuple(sorted(
-                {s.text for s, _, _ in local if len(s.text) >= 3 and "\n" not in s.text},
-                key=len,
-                reverse=True,
-            ))
+            # Mask only the page's own spans, by offset: a value that wraps
+            # across lines lives in several literals and must lose the
+            # characters in all of them.
+            ranges = [(lo, hi) for _, lo, hi in local]
+            values = _scrub_values([s for s, _, _ in local])
             # pypdf 7 only allows rewriting a page's content once the page
             # belongs to the writer, so attach it first, then scrub and merge.
             writer.add_page(page)
             target = writer.pages[-1]
             result.annotations_removed += _strip_page_extras(target)
-            _scrub_text_layer(target, writer, values)
+            _scrub_text_layer(target, writer, ranges, text, values)
             marks = _page_marks(local, chunks, tokens)
             if marks:
                 overlay = _overlay_reader(target, marks)

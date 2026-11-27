@@ -163,6 +163,29 @@ def test_annotations_are_removed_from_the_redacted_copy(tmp_path: Path) -> None:
     assert verify_file(out, result.report).ok
 
 
+def test_line_wrapped_address_is_masked_in_the_text_layer(tmp_path: Path) -> None:
+    """Regression: a span holding a newline was skipped by the text-layer scrub,
+    so an address wrapped over two lines stayed copy-pasteable out of the PDF."""
+    from core.verify import verify_file
+
+    src = tmp_path / "address.pdf"
+    _write_pdf(
+        src,
+        [[
+            "Correspondence address: Flat 402, Sunview Apartments,",
+            "Bandra West, Mumbai 400050",
+        ]],
+    )
+
+    result, out = redact_pdf(src, RedactionPipeline(use_ner=False), None)
+
+    text = _text(Path(out))
+    assert "Sunview" not in text, "the first address line must be masked"
+    assert "Bandra West" not in text and "400050" not in text, "the second one too"
+    assert "Correspondence address:" in text, "the field label stays readable"
+    assert verify_file(out, result.report).ok
+
+
 def test_scanned_pdf_is_refused_instead_of_emptied(tmp_path: Path) -> None:
     """Regression: an image-only PDF used to produce a silent empty document."""
     src = tmp_path / "scan.pdf"
